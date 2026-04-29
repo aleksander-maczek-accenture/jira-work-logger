@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Jira Worklogs — zakres dat</title>
+</head>
+<body>
+<main class="appShell">
+<header class="appHeader">
+    <div>
+        <div class="eyebrow">Chrome extension</div>
+        <h1>Jira Worklogs</h1>
+        <p class="lead">Przegladaj, sumuj i poprawiaj wpisy czasu bez przeklikiwania Jira.</p>
+    </div>
+    <div class="headerStats">
+        <div class="statBlock">
+            <span>Uzytkownik</span>
+            <strong id="user">-</strong>
+        </div>
+        <div class="statBlock accent">
+            <span>Suma</span>
+            <strong id="total">00:00</strong>
+        </div>
+    </div>
+</header>
+
+<section class="panel controlsPanel">
+    <div class="sectionHeader">
+        <div>
+            <h2>Polaczenie i zakres</h2>
+            <p>Ustaw parametry pobierania worklogow z Jira.</p>
+        </div>
+        <span id="status" class="statusPill">Gotowe.</span>
+    </div>
+
+    <div class="formGrid">
+        <label class="field fieldWide">Base URL
+            <input id="baseUrl" placeholder="https://xxx.atlassian.net" />
+        </label>
+        <label class="field">Project
+            <input id="project" placeholder="ABC" />
+        </label>
+
+        <label class="field">Email
+            <input id="email" placeholder="name@company.com" />
+        </label>
+        <label class="field">API Token
+            <input id="token" type="password" placeholder="••••••••" />
+        </label>
+
+        <label class="field">Date from
+            <input id="dateFrom" type="date" />
+        </label>
+        <label class="field">Date to
+            <input id="dateTo" type="date" />
+        </label>
+    </div>
+
+    <div class="actionBar">
+        <button id="fetchBtn" class="primaryBtn">Pobierz</button>
+        <button id="refreshBtn" class="secondaryBtn" title="Odswiez z API">Odswiez</button>
+        <div class="hint">Ostatni wynik jest pamietany w tej karcie i w storage rozszerzenia.</div>
+    </div>
+</section>
+
+<section class="panel tablePanel">
+    <div class="sectionHeader tableHeader">
+        <div>
+            <h2>Worklogi</h2>
+            <p>Edytuj czas bezposrednio z wiersza.</p>
+        </div>
+    </div>
+    <div class="tableWrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Data</th><th>Issue</th><th>Czas</th><th>Summary</th><th>Komentarz</th><th></th>
+            </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
+</section>
+
+<dialog id="editDlg">
+    <form method="dialog" class="dlg">
+        <h2>Edytuj worklog</h2>
+        <div id="editInfo" class="mono"></div>
+        <label class="field">Nowy czas (HH:MM)
+            <input id="newTime" />
+        </label>
+        <menu class="dialogActions">
+            <button value="cancel" class="secondaryBtn">Anuluj</button>
+            <button id="saveBtn" value="default" class="primaryBtn">Zapisz</button>
+        </menu>
+    </form>
+</dialog>
+
+<script type="module" src="page.js"></script>
+</main>
+</body>
+</html>

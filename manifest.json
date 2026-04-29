@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Jira Worklogs Range",
+  "version": "0.2.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Jira Worklogs"
+  },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://*.atlassian.net/*"
+  ]
+}
