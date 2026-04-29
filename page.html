@@ -7,6 +7,7 @@
     <title>Jira Worklogs — zakres dat</title>
 </head>
 <body>
+<div id="bartkiLayer" class="bartkiLayer" aria-hidden="true"></div>
 <main class="appShell">
 <header class="appHeader">
     <div>
@@ -62,6 +63,17 @@
         <button id="fetchBtn" class="primaryBtn">Pobierz</button>
         <button id="refreshBtn" class="secondaryBtn" title="Odswiez z API">Odswiez</button>
         <div class="hint">Ostatni wynik jest pamietany w tej karcie i w storage rozszerzenia.</div>
+    </div>
+
+    <div class="bartkiControls" aria-label="Ustawienia animacji tla">
+        <label class="toggleField">
+            <input id="bartkiEnabled" type="checkbox" />
+            <span>Animacja Bartkow w tle</span>
+        </label>
+        <label class="field compactField">Liczba Bartkow
+            <input id="bartkiCount" type="number" min="1" max="24" step="1" />
+        </label>
+        <button id="bartkiMoreBtn" class="secondaryBtn" type="button">Zwieksz liczbe Bartkow</button>
     </div>
 </section>
 

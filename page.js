@@ -4,10 +4,23 @@ const $ = (id) => document.getElementById(id);
 
 const state = {
   rows: [],
-  selected: null
+  selected: null,
+  bartki: {
+    enabled: true,
+    count: 4
+  }
 };
 
+const BARTKI_MIN = 1;
+const BARTKI_MAX = 24;
+
 function setStatus(s) { $("status").textContent = s; }
+
+function clampNumber(value, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return min;
+  return Math.min(Math.max(parsed, min), max);
+}
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -51,8 +64,24 @@ async function saveSettings() {
   });
 }
 
+async function saveBartkiSettings() {
+  await chrome.storage.sync.set({
+    bartkiEnabled: state.bartki.enabled,
+    bartkiCount: state.bartki.count
+  });
+}
+
 async function loadSettings() {
-  const data = await chrome.storage.sync.get(["baseUrl","email","token","dateFrom","dateTo","project"]);
+  const data = await chrome.storage.sync.get([
+    "baseUrl",
+    "email",
+    "token",
+    "dateFrom",
+    "dateTo",
+    "project",
+    "bartkiEnabled",
+    "bartkiCount"
+  ]);
   if (data.baseUrl) $("baseUrl").value = data.baseUrl;
   if (data.email) $("email").value = data.email;
   if (data.token) $("token").value = data.token;
@@ -78,6 +107,53 @@ async function loadSettings() {
 
   $("dateFrom").value = data.dateFrom || defFrom;
   $("dateTo").value = data.dateTo || defTo;
+
+  state.bartki.enabled = data.bartkiEnabled ?? true;
+  state.bartki.count = clampNumber(data.bartkiCount ?? 4, BARTKI_MIN, BARTKI_MAX);
+  $("bartkiEnabled").checked = state.bartki.enabled;
+  $("bartkiCount").value = state.bartki.count;
+}
+
+function renderBartki() {
+  const layer = $("bartkiLayer");
+  layer.innerHTML = "";
+  layer.classList.toggle("isHidden", !state.bartki.enabled);
+
+  if (!state.bartki.enabled) return;
+
+  for (let i = 0; i < state.bartki.count; i += 1) {
+    const fly = document.createElement("span");
+    fly.className = "bartHeadFly";
+    fly.style.setProperty("--size", `${Math.round(48 + Math.random() * 30)}px`);
+    fly.style.setProperty("--opacity", (0.12 + Math.random() * 0.12).toFixed(2));
+    fly.style.setProperty("--x-start", `${Math.round(Math.random() * 92)}vw`);
+    fly.style.setProperty("--y-start", `${Math.round(Math.random() * 88)}vh`);
+    fly.style.setProperty("--x-mid", `${Math.round(Math.random() * 92)}vw`);
+    fly.style.setProperty("--y-mid", `${Math.round(Math.random() * 88)}vh`);
+    fly.style.setProperty("--x-end", `${Math.round(Math.random() * 92)}vw`);
+    fly.style.setProperty("--y-end", `${Math.round(Math.random() * 88)}vh`);
+    fly.style.setProperty("--duration", `${Math.round(18 + Math.random() * 18)}s`);
+    fly.style.setProperty("--delay", `${Math.round(Math.random() * -28)}s`);
+
+    const head = document.createElement("img");
+    head.className = "bartHead";
+    head.src = "assets/bart-head.png";
+    head.alt = "";
+    head.style.setProperty("--spin", `${Math.round(7 + Math.random() * 8)}s`);
+    head.style.setProperty("--spin-direction", Math.random() > 0.5 ? "normal" : "reverse");
+
+    fly.appendChild(head);
+    layer.appendChild(fly);
+  }
+}
+
+async function updateBartkiSettings({ enabled = state.bartki.enabled, count = state.bartki.count } = {}) {
+  state.bartki.enabled = Boolean(enabled);
+  state.bartki.count = clampNumber(count, BARTKI_MIN, BARTKI_MAX);
+  $("bartkiEnabled").checked = state.bartki.enabled;
+  $("bartkiCount").value = state.bartki.count;
+  renderBartki();
+  await saveBartkiSettings();
 }
 
 function validate() {
@@ -202,7 +278,17 @@ async function onSaveEdit(e) {
 $("fetchBtn").addEventListener("click", () => onFetch({ force: true }));
 $("refreshBtn").addEventListener("click", () => onFetch({ force: false }));
 $("saveBtn").addEventListener("click", onSaveEdit);
+$("bartkiEnabled").addEventListener("change", (event) => {
+  void updateBartkiSettings({ enabled: event.target.checked });
+});
+$("bartkiCount").addEventListener("change", (event) => {
+  void updateBartkiSettings({ count: event.target.value });
+});
+$("bartkiMoreBtn").addEventListener("click", () => {
+  void updateBartkiSettings({ count: state.bartki.count + 1 });
+});
 
 // start
 await loadSettings();
+renderBartki();
 await restoreLastResultIfAny();
