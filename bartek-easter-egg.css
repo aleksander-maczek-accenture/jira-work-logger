@@ -1,0 +1,37 @@
+.bartekRampage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  color: white;
+}
+.bartekRampage::backdrop { background: #1118271c; }
+.rampageSky { position: absolute; inset: 0; background: linear-gradient(transparent 20%, #18241c99); }
+.rampageCracks { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .85; animation: rampageCrack .4s ease-out both; }
+.bartekRampageActive .rampageFragment { animation: rampageBreak 1.3s var(--rampage-delay) ease-in forwards; pointer-events: none; }
+.rampageDebris { position: absolute; inset: 0; pointer-events: none; }
+.rampageDebris i { position: absolute; display: block; background: #e1e6edb3; border: 1px solid #fff9; clip-path: polygon(0 0,100% 20%,75% 100%,15% 85%); animation: rampageFall 2.5s var(--fall-delay) ease-in both; }
+.rampageMonster { position: absolute; width: min(650px,80vw); bottom: -30px; left: 0; filter: drop-shadow(0 18px 16px #0007); animation: rampageWalk 8.5s linear both; }
+.rampageMonster svg { display: block; width: 100%; animation: rampageStomp .65s ease-in-out infinite alternate; }
+.rampageCaption { position: absolute; top: 10%; left: 20px; right: 20px; display: grid; gap: 8px; text-align: center; text-shadow: 0 3px 8px #000; font-family: system-ui,sans-serif; }
+.rampageCaption strong { font-size: clamp(32px,6vw,80px); font-weight: 900; letter-spacing: .04em; }
+.rampageCaption span { font-size: clamp(13px,2vw,20px); }
+.bartekRampage .rampageStop { position: absolute; right: 20px; bottom: 20px; min-height: 40px; padding: 10px 16px; border: 1px solid #ffffff80; border-radius: 8px; color: #fff; background: #172033; box-shadow: none; cursor: pointer; }
+@keyframes rampageCrack { from { opacity: 0; scale: .7; } to { opacity: .85; scale: 1; } }
+@keyframes rampageBreak { 0%,15% { transform: none; opacity: 1; } 45% { transform: translate(0,5px) rotate(1deg); } 100% { transform: translate(var(--rampage-x),var(--rampage-y)) rotate(var(--rampage-angle)); opacity: .2; } }
+@keyframes rampageFall { from { opacity: 0; transform: none; } 10% { opacity: .9; } to { opacity: 0; transform: translate(var(--fall-x),100vh) rotate(var(--fall-rotate)); } }
+@keyframes rampageWalk { from { translate: -90% 0; } 30% { translate: 15vw 0; } 70% { translate: 40vw 0; } to { translate: 110vw 0; } }
+@keyframes rampageStomp { from { transform: rotate(-2deg) translateY(0); } to { transform: rotate(2deg) translateY(12px); } }
+@media (prefers-reduced-motion: reduce) {
+  .bartekRampageActive .rampageFragment { animation: none; }
+  .rampageCracks, .rampageMonster, .rampageMonster svg { animation: none; }
+  .rampageMonster { left: 25%; }
+  .rampageDebris { display: none; }
+}

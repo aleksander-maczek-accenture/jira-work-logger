@@ -4,11 +4,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <link rel="stylesheet" href="bartek-easter-egg.css" />
     <title>Jira Worklogs — zakres dat</title>
 </head>
 <body>
-<div id="bartkiLayer" class="bartkiLayer" aria-hidden="true"></div>
+<div id="fetchActivity" class="fetchActivity" hidden role="status" aria-live="polite">
+    <span class="fetchSpinner" aria-hidden="true"></span>
+    <span id="fetchActivityText">Pobieram dane z Jiry…</span>
+    <span class="fetchActivityTrack" aria-hidden="true"></span>
+</div>
 <main class="appShell">
+<div class="appearanceBar">
+    <label for="themeSelect">Wygląd</label>
+    <select id="themeSelect">
+        <option value="classic">Klasyczny</option>
+        <option value="ledger">Ledger — biurowy</option>
+        <option value="bartek">Bartek — stara strona tabelkowa</option>
+        <option value="xp">Windows XP</option>
+        <option value="minecraft">Minecraft</option>
+        <option value="audiophile">Audiofil</option>
+        <option value="macos">macOS — Dock</option>
+        <option value="yellow">Żółta platforma</option>
+    </select>
+</div>
 <header class="appHeader">
     <div>
         <div class="eyebrow">Chrome extension</div>
@@ -24,37 +43,36 @@
             <span>Suma</span>
             <strong id="total">00:00</strong>
         </div>
+        <div class="statBlock warn">
+            <span>Braki</span>
+            <strong id="missing">-</strong>
+        </div>
     </div>
 </header>
 
 <section class="panel controlsPanel">
     <div class="sectionHeader">
         <div>
-            <h2>Polaczenie i zakres</h2>
-            <p>Ustaw parametry pobierania worklogow z Jira.</p>
+            <h2>Okres</h2>
+            <p>Wybierz okres, dla którego chcesz pobrać worklogi.</p>
         </div>
         <span id="status" class="statusPill">Gotowe.</span>
     </div>
 
-    <div class="formGrid">
-        <label class="field fieldWide">Base URL
-            <input id="baseUrl" placeholder="https://xxx.atlassian.net" />
-        </label>
-        <label class="field">Project
-            <input id="project" placeholder="ABC" />
-        </label>
-
-        <label class="field">Email
-            <input id="email" placeholder="name@company.com" />
-        </label>
-        <label class="field">API Token
-            <input id="token" type="password" placeholder="••••••••" />
-        </label>
-
-        <label class="field">Date from
+    <div class="periodPicker">
+      <label class="field">Wybierz okres<select id="periodMode"><option value="month">Miesiąc</option><option value="custom">Własny zakres</option></select></label>
+      <div id="monthPickerControls" class="monthPickerControls">
+        <button id="previousMonth" type="button" class="secondaryBtn" aria-label="Poprzedni miesiąc">‹</button>
+        <label class="field">Miesiąc<input id="periodMonth" type="month" /></label>
+        <button id="nextMonth" type="button" class="secondaryBtn" aria-label="Następny miesiąc">›</button>
+        <button id="currentMonth" type="button" class="secondaryBtn">Bieżący miesiąc</button>
+      </div>
+    </div>
+    <div id="customDateRange" class="formGrid rangeGrid" hidden>
+        <label class="field">Od dnia
             <input id="dateFrom" type="date" />
         </label>
-        <label class="field">Date to
+        <label class="field">Do dnia
             <input id="dateTo" type="date" />
         </label>
     </div>
@@ -65,19 +83,49 @@
         <div class="hint">Ostatni wynik jest pamietany w tej karcie i w storage rozszerzenia.</div>
     </div>
 
-    <div class="bartkiControls" aria-label="Ustawienia animacji tla">
-        <label class="toggleField">
-            <input id="bartkiEnabled" type="checkbox" />
-            <span>Animacja Bartkow w tle</span>
-        </label>
-        <label class="field compactField">Liczba Bartkow
-            <input id="bartkiCount" type="number" min="1" max="24" step="1" />
-        </label>
-        <button id="bartkiMoreBtn" class="secondaryBtn" type="button">Zwieksz liczbe Bartkow</button>
-    </div>
+    <p id="rangeNotice" class="rangeNotice"></p>
+
 </section>
 
-<section class="panel tablePanel">
+<nav class="tabs" aria-label="Widoki">
+    <button class="tabBtn isActive" type="button" data-tab="days"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="22" height="21" rx="3"/><path d="M5 13h22M11 4v6m10-6v6M11 19h3m4 0h3m-10 4h3"/></svg></span><span class="tabLabel">Dni</span></button>
+    <button class="tabBtn" type="button" data-tab="worklogs"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="11"/><path d="M16 9v7l5 3"/></svg></span><span class="tabLabel">Worklogi</span></button>
+    <button class="tabBtn" type="button" data-tab="workedIssues"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="20" height="23" rx="3"/><path d="m10 13 2 2 4-4m2 3h4m-12 7h12"/></svg></span><span class="tabLabel">Moje tickety</span></button>
+    <button class="tabBtn" type="button" data-tab="pinnedIssues"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 5 12 4-3 4v6l-4-1-6 9 3-11-4-2 4-5z"/></svg></span><span class="tabLabel">Stale tickety</span></button>
+    <button class="tabBtn" type="button" data-tab="reminders"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 23h18l-3-5v-6a6 6 0 0 0-12 0v6zM13 27h6M16 3v3"/></svg></span><span class="tabLabel">Braki i przypomnienia</span></button>
+    <button class="tabBtn" type="button" data-tab="assistant"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h22v17H13l-8 6zM10 11h12M10 16h8"/></svg></span><span class="tabLabel">Asystent</span></button>
+    <button class="tabBtn" type="button" data-tab="settings"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8h20M6 16h20M6 24h20"/><circle cx="12" cy="8" r="3"/><circle cx="21" cy="16" r="3"/><circle cx="12" cy="24" r="3"/></svg></span><span class="tabLabel">Ustawienia</span></button>
+</nav>
+
+<section id="daysTab" class="panel tablePanel tabView isActive">
+    <div class="sectionHeader tableHeader">
+        <div>
+            <h2>Dzien po dniu</h2>
+            <p>Worklogi z kazdego dnia, minimum dzienne i szybkie dodanie daily.</p>
+        </div>
+        <div class="dayStatusGroup">
+            <span class="statusPill dayStatus" title="Zakres pobranych danych"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v5m8-5v5"/></svg><span id="daysRange">—</span></span>
+            <span class="statusPill dayStatus" title="Zalogowany czas / cel do dzisiaj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg><span id="daysTime">—</span></span>
+        </div>
+    </div>
+
+    <figure class="chartFigure">
+        <figcaption>
+            <strong>Zalogowany czas dziennie</strong>
+            <span id="chartCaption" class="hint"></span>
+        </figcaption>
+        <label class="chartWeekendToggle"><input id="showEmptyWeekends" type="checkbox" /> Pokaż puste weekendy</label>
+        <div id="weeklyChart" class="weeklyChart"></div>
+    </figure>
+
+    <div class="rovoSummaryToolbar">
+        <strong>Podsumowanie pracy</strong>
+        <span id="localAISummaryStatus" class="localAISummaryStatus" role="status" aria-live="polite">Lokalne AI · gotowe</span>
+    </div>
+    <div id="daysList" class="daysList"></div>
+</section>
+
+<section id="worklogsTab" class="panel tablePanel tabView">
     <div class="sectionHeader tableHeader">
         <div>
             <h2>Worklogi</h2>
@@ -96,12 +144,212 @@
     </div>
 </section>
 
+<section id="workedIssuesTab" class="panel tablePanel tabView">
+    <div class="sectionHeader tableHeader">
+        <div>
+            <h2>Moje tickety</h2>
+            <p>Tickety z Twoim przypisaniem, worklogiem, komentarzem albo zmiana w historii.</p>
+        </div>
+    </div>
+    <div class="tableWrap compactTableWrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Issue</th><th>Summary</th><th>Status</th><th>Raportowany czas</th><th>Zrodlo</th><th></th>
+            </tr>
+            </thead>
+            <tbody id="workedIssuesBody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section id="pinnedIssuesTab" class="panel tablePanel tabView">
+    <div class="sectionHeader tableHeader">
+        <div>
+            <h2>Stale tickety</h2>
+            <p>Lista ticketow, do ktorych regularnie raportujesz czas.</p>
+        </div>
+    </div>
+    <div class="pinnedForm">
+        <label class="field">Issue key
+            <input id="pinnedIssueKey" placeholder="ABC-123" />
+        </label>
+        <label class="field fieldGrow">Opis
+            <input id="pinnedIssueSummary" placeholder="Np. daily, support, administracja" />
+        </label>
+        <button id="addPinnedIssueBtn" class="secondaryBtn" type="button">Dodaj do stalych</button>
+    </div>
+    <div class="tableWrap compactTableWrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Issue</th><th>Opis</th><th></th>
+            </tr>
+            </thead>
+            <tbody id="pinnedIssuesBody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section id="remindersTab" class="panel tablePanel tabView">
+    <div class="sectionHeader tableHeader">
+        <div>
+            <h2>Braki i przypomnienia</h2>
+            <p>Powiadomienie na koniec miesiaca i lista dni roboczych bez pelnego czasu.</p>
+        </div>
+        <span id="reminderNext" class="statusPill">-</span>
+    </div>
+
+    <div class="reminderBody">
+        <div class="reminderCard">
+            <h3>Przypomnienie</h3>
+            <label class="toggleField">
+                <input id="reminderEnabled" type="checkbox" />
+                <span>Przypominaj na koniec miesiaca</span>
+            </label>
+            <div class="reminderGrid">
+                <label class="field">Godzina
+                    <input id="reminderHour" type="number" min="0" max="23" step="1" />
+                </label>
+                <label class="field">Dni robocze wczesniej
+                    <input id="reminderLeadDays" type="number" min="0" max="10" step="1" />
+                </label>
+                <label class="field">Ustaw dla dni pracy (h)
+                    <input id="dailyTargetHours" type="number" min="1" max="24" step="0.5" />
+                </label>
+            </div>
+            <label class="toggleField">
+                <input id="reminderRespectHolidays" type="checkbox" />
+                <span>Pomijaj polskie swieta</span>
+            </label>
+            <div class="weeklySchedule">
+                <h3>Twój tydzień pracy</h3>
+                <p class="hint">Godziny dla każdego dnia. 0 = wolne. Urlopy i wyłączone święta pomniejszają cel.</p>
+                <div class="weeklyScheduleGrid">
+                    <label class="field">Pon<input data-weekday-hours="1" type="number" min="0" max="24" step="0.5" aria-label="Pon — godziny pracy" /></label>
+                    <label class="field">Wt<input data-weekday-hours="2" type="number" min="0" max="24" step="0.5" aria-label="Wt — godziny pracy" /></label>
+                    <label class="field">Śr<input data-weekday-hours="3" type="number" min="0" max="24" step="0.5" aria-label="Śr — godziny pracy" /></label>
+                    <label class="field">Czw<input data-weekday-hours="4" type="number" min="0" max="24" step="0.5" aria-label="Czw — godziny pracy" /></label>
+                    <label class="field">Pt<input data-weekday-hours="5" type="number" min="0" max="24" step="0.5" aria-label="Pt — godziny pracy" /></label>
+                    <label class="field">Sob<input data-weekday-hours="6" type="number" min="0" max="24" step="0.5" aria-label="Sob — godziny pracy" /></label>
+                    <label class="field">Nd<input data-weekday-hours="0" type="number" min="0" max="24" step="0.5" aria-label="Nd — godziny pracy" /></label>
+                </div>
+                <button id="saveWeeklyHours" type="button" class="secondaryBtn">Zapisz harmonogram</button>
+            </div>
+            <div class="reminderActions">
+                <button id="reminderTestBtn" class="secondaryBtn" type="button">Sprawdz i powiadom teraz</button>
+            </div>
+            <div id="reminderHint" class="hint"></div>
+        </div>
+
+        <div class="reminderCard">
+            <h3>Podsumowanie zakresu</h3>
+            <div id="reminderSummary" class="reminderSummary"></div>
+        </div>
+    </div>
+
+    <div class="tableWrap compactTableWrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Data</th><th>Dzien</th><th>Zalogowane</th><th>Brakuje</th><th></th>
+            </tr>
+            </thead>
+            <tbody id="missingDaysBody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section id="assistantTab" class="panel tabView assistantTab" aria-labelledby="assistantTabHeading">
+    <header class="sectionHeader"><div class="assistantTabTitle"><img src="assets/bart-head.png" alt="" width="48" height="48" /><div><h2 id="assistantTabHeading">Rozmowa z Bartkiem</h2><p>Zapytaj o swoją pracę i rozliczenie godzin. Odpowiedzi powstają lokalnie w Ollama.</p></div></div></header>
+        <section class="worklogProposalSection" aria-labelledby="proposalHeading"><h3 id="proposalHeading">Bartek zaproponuje worklog</h3><div class="worklogProposalActions"><label for="proposalDate">Dzien</label><input id="proposalDate" type="date" /><button id="proposeWorklog" type="button" class="secondaryBtn">Zaproponuj worklog</button><button id="stopWorklogProposal" type="button" class="secondaryBtn" hidden>Przerwij</button></div><p id="proposalStatus" role="status">Szkic komentarza na podstawie Twojej aktywnosci. Zapis wymaga zatwierdzenia.</p><div id="proposalResults"></div></section>
+        <section class="bartekAISection" aria-labelledby="bartekAIHeading">
+            <div class="bartekAIHeading"><h3 id="bartekAIHeading">Zapytaj Bartka · lokalne AI</h3><button id="bartekAIClear" type="button" class="secondaryBtn">Wyczyść</button></div>
+            <div class="bartekAIQuestions">
+                <button type="button" data-bartek-question="Nad czym pracowalem wczoraj?">Co robiłem wczoraj?</button>
+                <button type="button" data-bartek-question="Ile godzin zostalo do miesiecznego celu i czy dane obejmuja caly miesiac?">Ile zostało?</button>
+                <button type="button" data-bartek-question="Co warto sprawdzic w moich worklogach?">Co sprawdzić?</button>
+            </div>
+            <div id="bartekAIChat" class="bartekAIChat" role="log" aria-live="polite"></div>
+            <p id="bartekAIStatus" class="bartekAIStatus" role="status">Korzysta z modelu Ollama wybranego w Ustawieniach.</p>
+            <form id="bartekAIForm"><label class="field">Wiadomość do Bartka<textarea id="bartekAIQuestion" rows="2" maxlength="1200" placeholder="Np. podsumuj pracę nad eksportem…"></textarea></label><div class="bartekAIFormActions"><button id="bartekAIStop" type="button" class="secondaryBtn" hidden>Przerwij</button><button id="bartekAIAsk" type="submit" class="primaryBtn">Zapytaj</button></div></form>
+        </section>
+</section>
+
+<section id="settingsTab" class="panel controlsPanel tabView" aria-labelledby="settingsTitle">
+        <div class="sectionHeader">
+            <div>
+                <h2 id="settingsTitle">Ustawienia</h2>
+                <p>Zmiany zapisują się automatycznie po opuszczeniu pola.</p>
+            </div>
+        </div>
+        <div class="settingsGrid">
+            <label class="field fieldWide">Adres Jiry
+                <input id="baseUrl" type="url" placeholder="https://xxx.atlassian.net" />
+            </label>
+            <label class="field">Email
+                <input id="email" type="email" placeholder="name@company.com" />
+            </label>
+            <label class="field">API Token
+                <input id="token" type="password" placeholder="••••••••" autocomplete="off" />
+            </label>
+            <label class="field fieldWide">Projekty
+                <input id="project" placeholder="ABC, DEF" aria-describedby="projectHint" />
+                <span id="projectHint" class="hint">Klucze oddziel przecinkami. Puste pole: wszystkie projekty.</span>
+            </label>
+            <label class="field fieldWide">Ticket na spotkania
+                <input id="meetingIssueKey" placeholder="ABC-9" />
+            </label>
+        </div>
+        <section class="localAISettings" aria-labelledby="localAIHeading">
+            <h3 id="localAIHeading">Lokalne podsumowania AI · Ollama</h3>
+            <label class="toggleField"><input id="localAIEnabled" type="checkbox" /><span>Automatycznie podsumowuj dni po pobraniu worklogów</span></label>
+            <div class="settingsGrid">
+                <label class="field">Adres Ollama<input id="localAIEndpoint" value="http://127.0.0.1:11434" /></label>
+                <label class="field">Zainstalowany model<select id="localAIModel"><option value="qwen3:8b">qwen3:8b</option></select></label>
+            </div>
+            <fieldset><legend>Bitbucket · analiza zmian w kodzie</legend>
+            <label class="toggleField"><input id="bitbucketEnabled" type="checkbox" /><span>Dołącz zmiany z moich commitów do lokalnego AI</span></label>
+            <label class="field">Email konta Atlassian<input id="bitbucketEmail" type="email" autocomplete="off" /></label>
+            <label class="field">Token API Bitbucket<input id="bitbucketToken" type="password" autocomplete="off" /></label>
+            <p class="hint">Token z uprawnieniami read:user:bitbucket i read:repository:bitbucket. Dane dostępowe są zapisywane lokalnie w dodatku. Fragmenty kodu trafią do Twojej lokalnej Ollamy.</p>
+            <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener noreferrer">Utwórz token API z zakresami Bitbucket</a>
+            <div class="localAIActions"><button id="saveBitbucket" type="button" class="primaryBtn">Zapisz Bitbucket</button><button id="testBitbucket" type="button" class="secondaryBtn">Sprawdź Bitbucket</button></div>
+            <p id="bitbucketStatus" class="hint" role="status">Analiza kodu jest domyślnie wyłączona.</p>
+            </fieldset>
+            <label class="toggleField"><input id="localAIContext" type="checkbox" checked /><span>Dołącz opis, komentarze i historię zmian ticketów z Jiry</span></label>
+            <div class="localAIActions"><button id="saveLocalAI" type="button" class="primaryBtn">Zapisz</button><button id="refreshLocalAIModels" type="button" class="secondaryBtn">Odśwież modele</button><button id="testLocalAI" type="button" class="secondaryBtn">Sprawdź połączenie</button><button id="retryLocalAI" type="button" class="secondaryBtn">Ponów podsumowania</button></div>
+            <p class="hint">Na Macu z 24 GB RAM możesz wypróbować mocniejszy qwen3.5:9b: <code>ollama pull qwen3.5:9b</code> Po pobraniu kliknij „Odśwież modele”.</p>
+            <p id="localAIModelsStatus" class="hint" role="status">Lista modeli jest pobierana z lokalnej Ollama.</p>
+            <p id="localAIStatus" class="localAIStatus" role="status" aria-live="polite">Czekam na dane.</p>
+            <details><summary>Pierwsze uruchomienie</summary><p>Po instalacji Ollama pobierz model w Terminalu:</p><code>ollama pull qwen3:8b</code><p>Jeżeli Ollama odrzuca połączenie z dodatku (403), wykonaj poniższe polecenie i zamknij oraz ponownie uruchom Ollama:</p><code id="localAIOriginCommand"></code><p>Podsumowania powstają lokalnie, gdy karta dodatku jest otwarta. Są krótkie, zapisywane automatycznie i przeliczane po zmianach danych. Prywatne notatki nie są przekazywane modelowi.</p></details>
+        </section>
+        <label class="toggleField settingsToggle">
+            <input id="jiraPanelEnabled" type="checkbox" role="switch" />
+            <span>Panel worklogów na stronie Jira</span>
+        </label>
+        <label class="toggleField settingsToggle">
+            <input id="refreshOnReload" type="checkbox" role="switch" />
+            <span>Pobieraj aktualne dane z Jiry po F5</span>
+        </label>
+</section>
+
+<dialog id="localAIEditDlg" aria-labelledby="localAIEditHeading"><form method="dialog" class="dlg"><h2 id="localAIEditHeading">Podsumowanie dnia</h2><p class="hint">Po zapisaniu własnej wersji AI nie nadpisze jej automatycznie. Wyczyść tekst i zapisz, aby przy kolejnym generowaniu oddać ten dzień AI.</p><label class="field">Treść<textarea id="localAIEditText" rows="6"></textarea></label><menu class="dialogActions"><button value="cancel" class="secondaryBtn">Zamknij</button><button id="saveLocalAIEdit" type="button" class="primaryBtn">Zapisz własną wersję</button></menu></form></dialog>
+
+
+
 <dialog id="editDlg">
     <form method="dialog" class="dlg">
         <h2>Edytuj worklog</h2>
         <div id="editInfo" class="mono"></div>
+        <label class="field">Data
+            <input id="newWorklogDate" type="date" required />
+        </label>
         <label class="field">Nowy czas (HH:MM)
             <input id="newTime" />
+        </label>
+        <label class="field">Komentarz
+            <textarea id="newComment" rows="4"></textarea>
         </label>
         <menu class="dialogActions">
             <button value="cancel" class="secondaryBtn">Anuluj</button>
@@ -110,6 +358,89 @@
     </form>
 </dialog>
 
+<dialog id="addWorklogDlg">
+    <form method="dialog" class="dlg">
+        <h2>Nowy wpis</h2>
+        <p class="hint">Wybierz ticket i dodaj osobny wpis czasu.</p>
+        <div id="addWorklogInfo" class="mono"></div>
+        <button id="showAssignedAddIssues" type="button" class="secondaryBtn">Przypisane do mnie</button>
+        <label class="field">Ticket
+            <input id="addIssueKey" placeholder="Wyszukaj inny ticket: nazwa lub ABC-123" autocomplete="off" aria-describedby="issueSearchHint" aria-controls="issueSearchResults" />
+        </label>
+        <p id="issueSearchHint" class="hint">Twoje aktywne tickety znajdziesz obok. Inne wyszukasz po nazwie w pobranych danych lub po pelnym kluczu.</p>
+        <label class="field">Data
+            <input id="addWorklogDate" type="date" />
+        </label>
+        <label class="field">Czas (HH:MM)
+            <input id="addWorklogTime" placeholder="01:00" />
+        </label>
+        <label class="field">Komentarz
+            <textarea id="addWorklogComment" rows="4"></textarea>
+        </label>
+        <menu class="dialogActions">
+            <button value="cancel" class="secondaryBtn">Anuluj</button>
+            <button id="addWorklogSaveBtn" value="default" class="primaryBtn">Dodaj wpis</button>
+        </menu>
+    </form>
+    <aside id="issueSearchResults" class="issueSearchResults" aria-label="Znalezione tickety" aria-live="polite"></aside>
+</dialog>
+
+<dialog id="meetingsDlg">
+    <form method="dialog" class="dlg meetingsDlg">
+        <h2>Spotkania Teams</h2>
+        <div class="hint">Podaj liczbę spotkań w wybranym dniu. Czas zostanie obliczony z ich liczby i długości.</div>
+        <div id="meetingsInfo" class="mono"></div>
+        <label class="field">Data
+            <input id="meetingsDate" type="date" />
+        </label>
+        <div id="meetingRows" class="meetingRows"></div>
+        <div id="meetingsSummary" class="reminderSummary meetingsSummary"></div>
+        <menu class="dialogActions">
+            <button value="cancel" class="secondaryBtn">Anuluj</button>
+            <button id="meetingsSaveBtn" value="default" class="primaryBtn">Dodaj worklogi</button>
+        </menu>
+    </form>
+</dialog>
+
+
+<aside class="bartekAssistant" aria-label="Asystent Bartek">
+    <section id="bartekPanel" class="bartekPanel" hidden aria-labelledby="bartekHeading">
+        <header class="bartekPanelHead">
+            <img src="assets/bart-head.png" alt="" width="40" height="40" />
+            <div><h2 id="bartekHeading">Bartek</h2><span>Asystent worklogow</span></div>
+            <button id="bartekClose" type="button" aria-label="Zamknij asystenta">×</button>
+        </header>
+        <div class="bartekTargetSettings">
+            <label>Dziennie (h)<input id="bartekDailyHours" type="number" min="0.5" max="24" step="0.5" value="8" /></label>
+            <label>Cel miesiaca (h)<input id="bartekMonthlyHours" type="number" min="0" max="744" step="0.5" placeholder="Automatycznie" /></label>
+            <button id="bartekSaveTarget" type="button" class="secondaryBtn">Zapisz cel</button>
+            <small>Puste pole miesiaca: suma harmonogramu tygodnia bez urlopow. Wlasna suma zastepuje ten cel. Harmonogram ustawisz w Braki i przypomnienia.</small>
+        </div>
+        <div id="bartekOverview" class="bartekOverview" aria-live="polite"></div>
+        <div class="bartekTopics" role="group" aria-label="Co sprawdzic">
+            <button type="button" data-bartek-topic="backlog">Miesiac</button>
+            <button type="button" data-bartek-topic="today">Dzisiaj</button>
+            <button type="button" data-bartek-topic="plan">Plan uzupelnienia</button>
+            <button type="button" data-bartek-topic="checks">Kontrola</button>
+        </div>
+        <div id="bartekAdvice" class="bartekAdvice"></div>
+        <button id="bartekOpenChat" type="button" class="secondaryBtn bartekOpenChat">Otwórz rozmowę w zakładce Asystent</button>
+        <footer><button id="bartekRefresh" class="secondaryBtn" type="button">Odswiez dane</button><span>Analiza ostatnio pobranych worklogow</span></footer>
+    </section>
+    <div id="bartekSpeechWrap" class="bartekSpeechWrap">
+    <button id="bartekSpeech" class="bartekSpeech" type="button" aria-controls="bartekPanel" aria-expanded="false">
+        <span class="bartekSpeechName">Bartek mówi</span>
+        <span id="bartekBadge" aria-live="polite">Sprawdźmy worklogi</span>
+        <span id="bartekAIHeadline" class="bartekAIHeadline"></span>
+        <span class="bartekSpeechHint">Kliknij, żeby zobaczyć szczegóły</span>
+    </button>
+        <button id="bartekSpeechDismiss" class="bartekSpeechDismiss" type="button" aria-label="Zamknij dymek Bartek mowi" title="Zamknij dymek">×</button>
+    </div>
+    <button id="bartekToggle" class="bartekToggle" type="button" aria-controls="bartekPanel" aria-expanded="false">
+        <img src="assets/bart-head.png" alt="" width="36" height="36" />
+        <span><strong>Bartek</strong><small>Twój asystent worklogów</small></span>
+    </button>
+</aside>
 <script type="module" src="page.js"></script>
 </main>
 </body>

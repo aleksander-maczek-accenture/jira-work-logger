@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#0875d5"/><stop offset="1" stop-color="#a1d9f9"/></linearGradient>
+    <linearGradient id="far" x2="0" y2="1"><stop stop-color="#6ba840"/><stop offset="1" stop-color="#3b791d"/></linearGradient>
+    <linearGradient id="hill" x2="0.4" y2="1"><stop stop-color="#8dc43a"/><stop offset=".4" stop-color="#57a322"/><stop offset="1" stop-color="#246613"/></linearGradient>
+    <filter id="cloud"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1920v1080H0z"/>
+  <g fill="#fff" opacity=".82" filter="url(#cloud)">
+    <ellipse cx="320" cy="188" rx="160" ry="32"/><ellipse cx="408" cy="165" rx="91" ry="44"/>
+    <ellipse cx="1310" cy="270" rx="210" ry="35"/><ellipse cx="1420" cy="237" rx="100" ry="48"/>
+    <ellipse cx="870" cy="110" rx="120" ry="18"/>
+  </g>
+  <path fill="url(#far)" d="M0 670Q420 580 830 695T1920 560V1080H0Z"/>
+  <path fill="url(#hill)" d="M0 640C360 490 640 520 1020 680S1590 830 1920 700V1080H0Z"/>
+  <path fill="#b4d75b" opacity=".12" d="M0 660Q470 470 1000 705Q430 555 0 700Z"/>
+</svg>
