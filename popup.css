@@ -1,0 +1,22 @@
+.popupBody { width: 320px; background: var(--surface); }
+.popupShell { padding: 20px; }
+.popupBrand { display: flex; align-items: center; gap: 10px; }
+.popupBrand .brandMark { width: 30px; height: 30px; margin: 0; border-radius: 6px; font-size: 11px; box-shadow: none; }
+.popupBrand h1 { font-size: 17px; letter-spacing: -.3px; }
+.popupSummary { margin-top: 20px; padding-top: 0; border: 0; gap: 14px; }
+.popupPeriod { font-size: 13px; font-weight: 550; }
+.popupHours { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.popupHours > div { display: grid; gap: 4px; }
+.popupHours span { color: var(--muted); font-size: 11px; }
+.popupHours strong { font-size: 26px; font-weight: 650; line-height: 1.2; letter-spacing: -.6px; }
+.popupOvertime { border-left: 1px solid var(--line); padding-left: 18px; }
+.popupOvertime strong { color: #7c3aed; }
+.popupCompletion { font-size: 11px; color: var(--success); display: flex; align-items: center; gap: 6px; }
+.popupCompletion::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.popupCompletion:empty { display: none; }
+.popupCompletion.hasMissing { color: var(--warn); }
+.popupDetails { font-size: 11px; color: var(--muted); }
+.popupDetails summary { cursor: pointer; width: fit-content; }
+.popupDetails p { margin-top: 7px; line-height: 1.5; }
+.popupShell #openBtn { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 10px 12px; border-radius: 6px; box-shadow: none; }
+.popupEmpty { font-weight: 550; }

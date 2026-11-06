@@ -1,5 +1,7 @@
-import { actionSummaryTitle } from "./action-summary.js";
-import { loadReminderSettings, isReminderSettingKey } from "./reminders.js";
+import { formatDateRange } from './date-range.js';
+import { fmtHHMM } from './api.js';
+import { totalOvertime } from './time-metrics.js';
+import { loadReminderSettings, isReminderSettingKey, analyzeCompletion } from "./reminders.js";
 
 async function renderLastSummary() {
   const host = document.getElementById("lastSummary");
@@ -8,15 +10,26 @@ async function renderLastSummary() {
       chrome.storage.local.get(["lastResult", "lastResultSavedAt"]),
       loadReminderSettings()
     ]);
-    const title = document.createElement("h2");
-    title.textContent = "Ostatnio pobrane dane";
-    const lines = actionSummaryTitle(lastResult, lastResultSavedAt, settings).split("\n").slice(1);
-    const paragraphs = lines.flatMap((line) => line.split(" | ")).map((line) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = line;
-      return paragraph;
-    });
-    host.replaceChildren(title, ...paragraphs);
+    const element=(tag,text,className)=>{const node=document.createElement(tag);node.textContent=text;if(className)node.className=className;return node;};
+    if(!lastResult||!Array.isArray(lastResult.rows)){
+      host.replaceChildren(element('p','Brak pobranych danych.','popupEmpty'),element('p','Otwórz worklogi, aby połączyć Jirę i pobrać czas.','hint'));return;
+    }
+    const {dateFrom,dateTo,project}=lastResult.params||{};
+    const summary=dateFrom&&dateTo&&dateFrom<=dateTo?analyzeCompletion({rows:lastResult.rows,dateFrom,dateTo,dailyTargetHours:settings.dailyTargetHours,weeklyHours:settings.weeklyHours,respectHolidays:settings.reminderRespectHolidays,vacationDates:settings.vacationDates}):null;
+    const period=element('p',summary?formatDateRange({dateFrom,dateTo}):'Ostatnie dane','popupPeriod');
+    const hours=element('div','','popupHours');
+    const logged=lastResult.rows.reduce((sum,row)=>sum+Number(row.seconds||0),0);
+    for(const [label,value,style] of [['Zadeklarowane',fmtHHMM(logged),'popupDeclared'],['Nadgodziny',summary?`${totalOvertime(summary.days,settings)?'+':''}${fmtHHMM(totalOvertime(summary.days,settings))}`:'—','popupOvertime']]){
+      const metric=element('div','',style);metric.append(element('span',label),element('strong',value));hours.append(metric);
+    }
+    const status=element('p',summary?(summary.missingDays.length?`Dni do uzupełnienia: ${summary.missingDays.length}`:'Dotychczasowe dni uzupełnione'):'','popupCompletion');
+    status.classList.toggle('hasMissing',!!summary?.missingDays.length);
+    const details=element('details','','popupDetails');details.append(element('summary','Szczegóły'));
+    if(project)details.append(element('p',`Projekty: ${project.split(',').map(key=>key.trim()).join(', ')}`));
+    details.append(element('p',`Wpisy: ${lastResult.rows.length}`));
+    details.append(element('p','Nadgodziny: suma czasu ponad dzienne limity.'));
+    if(lastResultSavedAt)details.append(element('p',`Pobrano: ${new Date(lastResultSavedAt).toLocaleString('pl-PL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`));
+    host.replaceChildren(period,hours,status,details);
   } catch (error) {
     host.textContent = "Nie udalo sie wczytac ostatniego wyniku. Otworz karte rozszerzenia.";
     console.warn(error);

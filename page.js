@@ -1,3 +1,6 @@
+import { dailyWorkLimit, dailyOvertime } from './time-metrics.js';
+import { setLoadingWave } from './loading-wave.js';
+import { installWorkspaceUX } from './workspace-ux.js';
 import { monthDates, formatDateRange } from './date-range.js';
 import { installBitbucketSettings } from './bitbucket-context.js';
 import { installWorklogProposals } from "./worklog-proposals.js";
@@ -74,9 +77,12 @@ function setFetchBusy(busy) {
   document.querySelector(".appShell").setAttribute("aria-busy", String(busy));
   $("fetchBtn").disabled = busy;
   $("refreshBtn").disabled = busy;
-  $("refreshBtn").textContent = busy ? "Odswiezanie…" : "Odswiez";
+
+  $("refreshBtn").setAttribute("aria-label",busy?"Odświeżanie danych":"Odśwież dane");
+  $("newWorklog").disabled=busy;
   syncFetchControls();
   renderBartek();
+  setLoadingWave(busy);
 }
 
 function syncFetchControls() {
@@ -113,12 +119,12 @@ function findKnownIssue(issueKey) {
     state.pinnedIssues.find((issue) => issue.issueKey === issueKey);
 }
 
-function ticketLink(issueKey) {
+function ticketLink(issueKey, withIcon = false) {
   try {
     const base = new URL($("baseUrl").value.trim());
     if (!["https:", "http:"].includes(base.protocol)) return escapeHtml(issueKey);
     const url = new URL(`${base.pathname.replace(/\/$/, "")}/browse/${encodeURIComponent(issueKey)}`, base.origin);
-    return `<a class="ticketLink" href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer" title="Otworz ${escapeHtml(issueKey)} w Jira">${escapeHtml(issueKey)}</a>`;
+    return `<a class="ticketLink" href="${escapeHtml(url.href)}" target="_blank" rel="noopener noreferrer" title="Otworz ${escapeHtml(issueKey)} w Jira">${escapeHtml(issueKey)}${withIcon ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14M11 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6"/></svg>' : ""}</a>`;
   } catch {
     return escapeHtml(issueKey);
   }
@@ -669,8 +675,8 @@ function renderDayWorklogs(day) {
 
   const items = day.entries.map((row, index) => `
     <li class="dayWorklog">
-      <span class="dayWorklogKey">${ticketLink(row.issueKey)}</span>
-      <span class="dayWorklogTime">${escapeHtml(row.timeHHMM)}</span>
+      <span class="dayWorklogKey">${ticketLink(row.issueKey,true)}</span>
+      <span class="dayWorklogTime" aria-label="Czas wpisu: ${escapeHtml(row.timeHHMM)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>${escapeHtml(row.timeHHMM)}</span>
       <span class="dayWorklogText">
         <strong>${escapeHtml(row.summary || "-")}</strong>
         ${row.comment ? `<span>${escapeHtml(row.comment)}</span>` : ""}
@@ -735,9 +741,8 @@ function attachDayNote(card, date) {
   const propose = document.createElement("button");
   propose.type="button";propose.className="secondaryBtn dayQuickBtn";propose.textContent="Propozycja";propose.title="Bartek zaproponuje worklog na ten dzien";propose.disabled=fetchInProgress;
   propose.addEventListener("click",()=>{
-    setActiveTab("assistant");
-    $("proposalDate").value=date;
-    $("proposalHeading").scrollIntoView({behavior:"smooth",block:"center"});
+    openAddWorklog("","","",{date,timeHHMM:"01:00"});
+    $("drawerAI").open=true;
     void worklogProposals.propose(date);
   });
   card.querySelector(".dayQuickActions").append(propose);
@@ -911,6 +916,8 @@ async function navigateChartDay(date, weekendAdd = false) {
     openWeekendWorklog(date);
     return;
   }
+  workspaceUX.reveal(date);
+  renderDays();
   const target = $(`day-${date}`);
   const card = target?.closest(".dayCard") || target;
   if (!card) return;
@@ -922,6 +929,7 @@ async function navigateChartDay(date, weekendAdd = false) {
 function renderDays() {
   const host = $("daysList");
   const summary = currentSummary();
+  workspaceUX.update(summary);
 
   if (!summary) {
     $("daysRange").textContent = "—";
@@ -931,7 +939,10 @@ function renderDays() {
     return;
   }
 
-  const days = listDaysForDisplay(summary).slice().reverse();
+  const allDays = listDaysForDisplay(summary).slice().reverse();
+  const days = allDays.filter(day=>workspaceUX.matches(day));
+  $("visibleDayCount").textContent=`${days.length} dni`;
+  const defaultOpenDate=allDays.find(day=>day.date===iso(new Date()))?.date || allDays.find(day=>day.entries.length)?.date || allDays[0]?.date;
   $("daysRange").textContent = fmtRange(state.fetchedRange);
   $("daysTime").textContent = `${fmtHHMM(summary.loggedSeconds)} / ${fmtHHMM(summary.expectedSeconds)}`;
   renderWeeklyChart(summary);
@@ -940,7 +951,7 @@ function renderDays() {
   if (!days.length) {
     const allAhead = summary.days.some((day) => day.isWorkingDay) && !summary.countedDays;
     host.innerHTML = `<p class="emptyCell">${
-      allAhead
+      workspaceUX.getFilter()!=="all" ? "Brak dni pasujących do wybranego filtra." : allAhead
         ? "Wszystkie dni robocze z tego zakresu sa jeszcze przed nami."
         : "Brak dni roboczych w tym zakresie."
     }</p>`;
@@ -975,6 +986,8 @@ function renderDays() {
       continue;
     }
     const target = day.targetSeconds;
+    const overtime=dailyOvertime(day,state.reminder);
+    const displayedLimit=dailyWorkLimit(day,state.reminder);
     const percent = target ? Math.min(100, Math.round((day.seconds / target) * 100)) : 100;
     // Dzien w przyszlosci nie jest "brakiem" - jeszcze sie nie wydarzyl.
     const short = day.counted && day.seconds < target;
@@ -1007,9 +1020,8 @@ function renderDays() {
         <div class="dayMeter">
           <div class="meterTrack"><span class="meterFill" style="width:${percent}%"></span></div>
           <div class="dayNumbers">
-            <strong>${escapeHtml(fmtHHMM(day.seconds))}</strong>
-            <span>/ min ${escapeHtml(fmtHHMM(target))}</span>
-            <span class="dayDelta">${escapeHtml(delta)}</span>
+            <div class="dayDeclared"><span>Zadeklarowane</span><strong>${escapeHtml(fmtHHMM(day.seconds))}<small> / ${escapeHtml(fmtHHMM(displayedLimit))}</small></strong></div>
+            <span class="dayDelta${overtime>0?' isOvertime':''}">${overtime>0?`+${escapeHtml(fmtHHMM(overtime))}<small>nadgodzin</small>`:escapeHtml(delta)}</span>
           </div>
         </div>
       </header>
@@ -1027,13 +1039,14 @@ function renderDays() {
       void addDailyToDay(day.date, event.currentTarget);
     });
     card.querySelector("button[data-add-day-worklog]").addEventListener("click", () => {
-      openAddWorklog(issueKey, `Worklog za ${day.date}`, "", {
+      openAddWorklog("", "", "", {
         date: day.date,
         timeHHMM: fmtHHMM(Math.max(0, day.targetSeconds - day.seconds)) || "01:00"
       });
     });
     bindDayDeleteButtons(card, day);
     attachDayNote(card, day.date);
+    workspaceUX.decorate(card,day,defaultOpenDate);
     host.appendChild(card);
   }
 }
@@ -1088,6 +1101,7 @@ function holidayColumn(day, x, width, top, baseline, tip) {
 function renderWeeklyChart(summary) {
   const host = $("weeklyChart");
   const caption = $("chartCaption");
+  $("chartInfo").disabled=!summary;
 
   if (!summary) {
     caption.textContent = "";
@@ -1097,6 +1111,7 @@ function renderWeeklyChart(summary) {
 
   const days = visibleDays(summary).filter(day => $("showEmptyWeekends").checked || state.releaseDates.includes(day.date) || !isEmptyWeekend(day));
   if (!days.length) {
+    $("chartInfo").disabled=true;
     caption.textContent = "";
     host.innerHTML = `<p class="hint">Brak dni w tym zakresie.</p>`;
     return;
@@ -1115,6 +1130,7 @@ function renderWeeklyChart(summary) {
   const baseline = chart.padTop + chart.plotHeight;
   const y = (seconds) => baseline - (seconds / scaleMax) * chart.plotHeight;
 
+  const overtimeThreshold = day => dailyWorkLimit(day,state.reminder);
   const marks = [];
   const dayLabels = [];
   const weekLabels = [];
@@ -1139,6 +1155,10 @@ function renderWeeklyChart(summary) {
         (day.isVacation ? " (Urlop)" : day.targetSeconds ? ` z ${fmtHHMM(day.targetSeconds)}` : " (dzien wolny)") +
         (short ? ` - brakuje ${fmtHHMM(day.targetSeconds - day.seconds)}` : "") + (isRelease ? " · Dzien releasowy" : "") + (day.isHoliday ? " · Święto" : "");
 
+      const overtimeTarget=overtimeThreshold(day);
+      const overtime=Math.max(0,day.seconds-overtimeTarget);
+      const barBody=day.seconds>0?`<path class="chartBar ${tone}"${releaseFill} d="${barPath(barX,y(day.seconds),chart.bar,baseline)}"/>${overtime>0?`<path class="chartOverTarget" style="fill:url(#overtimeStripes)" data-over-target="${day.date}" data-threshold="${overtimeTarget}" data-excess-seconds="${overtime}" pointer-events="none" d="${barPath(barX,y(day.seconds),chart.bar,y(overtimeTarget))}"/>`:""}`:"";
+      const loggedTip=tip+(overtime>0?` · Ponad cel ${fmtHHMM(overtimeTarget)}: +${fmtHHMM(overtime)}`:"");
       const center = barX + chart.bar / 2;
       if (day.isHoliday) {
         marks.push(holidayColumn(day, barX, chart.bar, y(holidayBarSeconds), baseline, tip));
@@ -1157,8 +1177,8 @@ function renderWeeklyChart(summary) {
         const barTop = day.seconds > 0 ? y(day.seconds) : baseline;
         marks.push(`
           <g class="chartVacationMark" data-date="${day.date}">
-            <title>${escapeHtml(tip)}</title>
-            ${day.seconds > 0 ? `<path class="chartBar ${tone}"${releaseFill} d="${barPath(barX, barTop, chart.bar, baseline)}" />` : ""}
+            <title>${escapeHtml(loggedTip)}</title>
+            ${barBody}
             <rect class="chartVacationBadge" x="${barX}" y="${barTop - 22}" width="${chart.bar}" height="18" rx="4" />
             <text class="chartVacationText" x="${center}" y="${barTop - 9}">U</text>
           </g>
@@ -1168,7 +1188,7 @@ function renderWeeklyChart(summary) {
       } else {
         marks.push(
           day.seconds > 0
-            ? `<path class="chartBar ${tone}"${releaseFill} d="${barPath(barX, y(day.seconds), chart.bar, baseline)}" data-date="${day.date}"><title>${escapeHtml(tip)}</title></path>`
+            ? `<g class="chartLoggedBar" data-date="${day.date}"><title>${escapeHtml(loggedTip)}</title>${barBody}</g>`
             : day.targetSeconds > 0
               ? `<path class="chartBar chartEmptyOutline"${releaseFill} d="${barPath(barX, y(day.targetSeconds), chart.bar, baseline)}" data-date="${day.date}"><title>${escapeHtml(tip)}${day.date === today ? " · Dzien jeszcze trwa" : ""}</title></path>`
               : `<rect class="chartBar isEmpty"${releaseFill} x="${barX}" y="${baseline - 3}" width="${chart.bar}" height="3" rx="1.5" data-date="${day.date}"><title>${escapeHtml(tip)}</title></rect>`
@@ -1208,11 +1228,22 @@ function renderWeeklyChart(summary) {
     `<text class="chartTick isRule" x="${chart.padLeft - 12}" y="${targetY + 4}">${fmtHHMM(target)}</text>` +
     `<text class="chartRuleLabel" x="${width - chart.padRight}" y="${targetY - 7}">maks. cel dnia ${fmtHHMM(target)}</text>`;
 
-  caption.textContent = `${days.some(day => state.releaseDates.includes(day.date)) ? "Pasy = dzien releasowy | " : ""}${pluralWeeks(weeks.length)}, ${pluralDays(days.length)} - kliknij slupek, zeby przejsc do dnia; + w weekend dodaje wpis${days.some((day) => day.isVacation) ? " | U = Urlop" : ""}`;
+  caption.textContent = [
+    `${pluralWeeks(weeks.length)}, ${pluralDays(days.length)}.`,
+    days.some(day=>day.seconds>overtimeThreshold(day))?'Fioletowe pasy w prawo: czas ponad dzienny cel.':'',
+    days.some(day=>state.releaseDates.includes(day.date))?'Niebiesko-żółte pasy: dzień release’owy.':'',
+    days.some(day=>day.isVacation)?'U: urlop.':'',
+    'Kliknij słupek, aby przejść do dnia. „+” w weekend pozwala dodać wpis.'
+  ].filter(Boolean).join('\n');
+
   host.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
          aria-label="Zalogowany czas dziennie wzgledem minimum ${fmtHHMM(target)}">
       <defs>
+        <pattern id="overtimeStripes" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
+          <rect class="chartOverBase" width="8" height="8" />
+          <rect class="chartOverStripe" width="3" height="8" />
+        </pattern>
         <pattern id="releaseDayStripes" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
           <rect width="8" height="8" fill="#3b82f6" />
           <rect width="8" height="4" fill="#fbbf24" />
@@ -1467,7 +1498,8 @@ function renderReminders() {
 let bartekTopic = "backlog";
 
 function setBartekOpen(open) {
-  $("bartekPanel").hidden = !open;
+  $("bartekPanel").hidden = false;
+  if(open){setActiveTab("assistant");document.querySelector(".assistantOverview").open=true;}
   $("bartekToggle").setAttribute("aria-expanded", String(open));
   $("bartekSpeech").setAttribute("aria-expanded", String(open));
   if (open) renderBartek();
@@ -1684,7 +1716,7 @@ async function restoreLastResultIfAny() {
     $("total").textContent = lastResult.totalHHMM || "00:00";
     state.hasData = true;
     renderAll();
-    const when = lastResultSavedAt ? new Date(lastResultSavedAt).toLocaleString() : "";
+    const when = lastResultSavedAt ? new Date(lastResultSavedAt).toLocaleString("pl-PL") : "";
     setStatus(`Wczytano ostatni wynik. ${when}`);
   }
 }
@@ -1697,17 +1729,13 @@ async function onFetch({ force = true } = {}) {
     setFetchBusy(true);
     await saveSettings();
 
-    if (force) {
-      setStatus("Pobieram…");
-      $("user").textContent = "-";
-      $("total").textContent = "00:00";
-      state.myIssues = [];
-      state.hasData = false;
-      state.fetchedRange = null;
-      renderAll();
-    } else {
-      setStatus("Odświeżam…");
+    // Keep the last result visible until a complete replacement arrives.
+    // Clear it only when credentials point to a different Jira account.
+    if(state.fetchedSource && aiScope(state.fetchedSource.baseUrl,state.fetchedSource.email)!==aiScope(params.baseUrl,params.email)){
+      state.rows=[];state.myIssues=[];state.hasData=false;state.fetchedRange=null;
+      $("user").textContent="-";$("total").textContent="00:00";renderAll();
     }
+    setStatus(force?"Pobieram…":"Odświeżam…");
 
     setStatus("Pobieram worklogi i tickety...");
     const [{ displayName, rows, totalSeconds }, myIssues] = await Promise.all([
@@ -1765,6 +1793,8 @@ let issueSearchTimer;
 let issueSearchVersion = 0;
 let selectedAddIssue = null;
 let assignedAddIssues = [];
+let issuePickerMode="assigned";
+let addWorklogPending=false;
 
 const loggedTooltip = document.createElement("div");
 loggedTooltip.id = "loggedTimeTooltip";
@@ -1856,7 +1886,7 @@ async function searchAddIssue() {
   ).slice(0, 8);
   const renderMatches = () => {
     host.replaceChildren();
-    const title=document.createElement('h3');title.className='issueResultsHeading';title.textContent=query?'Wyniki wyszukiwania':'Przypisane do mnie';host.append(title);
+    const title=document.createElement('h3');title.className='issueResultsHeading';title.textContent=query?'Wyniki wyszukiwania':issuePickerMode==='assigned'?'Przypisane do mnie':issuePickerMode==='recent'?'Ostatnio używane':'Stałe tickety';host.append(title);
     for (const issue of matches) {
       const button = document.createElement("button");
       button.type = "button";
@@ -1879,6 +1909,11 @@ async function searchAddIssue() {
       host.append(button);
     }
   };
+  if(!query&&issuePickerMode!=='assigned'){
+    const latest=new Map();for(const row of state.rows)if((row.started||row.date)>(latest.get(row.issueKey)||''))latest.set(row.issueKey,row.started||row.date);
+    matches=(issuePickerMode==='pinned'?state.pinnedIssues:aggregateIssues(state.rows).sort((a,b)=>(latest.get(b.issueKey)||'').localeCompare(latest.get(a.issueKey)||''))).filter(issue=>!isDoneStatus(issue.status)).slice(0,30);renderMatches();
+    $('addWorklogInfo').textContent=matches.length?'Wybierz ticket, do którego dodasz czas.':'Brak ticketów w tej grupie. Wpisz klucz w wyszukiwarce.';return;
+  }
   if (!query) {
     $("addWorklogInfo").textContent = "Pobieram tickety przypisane do Ciebie…";
     try {
@@ -1919,10 +1954,10 @@ async function searchAddIssue() {
   }
 }
 
-$("showAssignedAddIssues").addEventListener("click", () => {
-  clearTimeout(issueSearchTimer);
-  $("addIssueKey").value = "";
-  void searchAddIssue();
+$('issuePickerTabs').addEventListener('click',event=>{
+  const button=event.target.closest('[data-issue-mode]');if(!button)return;
+  issuePickerMode=button.dataset.issueMode;for(const tab of $('issuePickerTabs').querySelectorAll('button'))tab.setAttribute('aria-pressed',String(tab===button));
+  clearTimeout(issueSearchTimer);$('addIssueKey').value='';void searchAddIssue();
 });
 
 $("addIssueKey").addEventListener("input", () => {
@@ -1946,13 +1981,16 @@ $("addIssueKey").addEventListener("keydown", (event) => {
     else { clearTimeout(issueSearchTimer); void searchAddIssue(); }
   }
 });
+$("addWorklogDlg").addEventListener("cancel",event=>{if(addWorklogPending)event.preventDefault();});
 $("addWorklogDlg").addEventListener("close", () => {
+  worklogProposals.cancel();
   clearTimeout(issueSearchTimer);
   issueSearchVersion += 1;
 });
 
 function openAddWorklog(issueKey, summary = "", status = "", { date, timeHHMM, comment = "" } = {}) {
   if (fetchInProgress) return;
+  worklogProposals.cancel();
   if (isDoneStatus(status)) {
     void showNotice(`Nie mozna dodac workloga do ${issueKey}, bo ticket jest DONE.`);
     return;
@@ -1963,6 +2001,7 @@ function openAddWorklog(issueKey, summary = "", status = "", { date, timeHHMM, c
   $("addWorklogTime").value = timeHHMM || "01:00";
   $("addWorklogComment").value = comment;
   assignedAddIssues = [];
+  issuePickerMode="assigned";for(const tab of $("issuePickerTabs").querySelectorAll("button"))tab.setAttribute("aria-pressed",String(tab.dataset.issueMode==="assigned"));
   $("addWorklogDlg").showModal();
   clearTimeout(issueSearchTimer);
   void searchAddIssue();
@@ -2011,7 +2050,7 @@ async function onSaveEdit(e) {
 
 async function onAddWorklog(e) {
   e.preventDefault();
-  if (fetchInProgress) return;
+  if (fetchInProgress||addWorklogPending) return;
   try {
     const params = validate();
     const issueKey = $("addIssueKey").value.trim().toUpperCase();
@@ -2027,7 +2066,10 @@ async function onAddWorklog(e) {
     if (!date) throw new Error("Podaj date.");
     parseHHMM(timeHHMM);
 
-    setStatus("Dodaje worklog...");
+    setStatus("Zapisuję nowy wpis…");
+    addWorklogPending=true;
+    $("addWorklogSaveBtn").disabled=true;$("addWorklogSaveBtn").textContent="Zapisuję…";
+    $("drawerClose").disabled=true;$("addWorklogDlg").querySelector('button[value="cancel"]').disabled=true;
     await addWorklog({
       baseUrl: params.baseUrl,
       email: params.email,
@@ -2039,16 +2081,24 @@ async function onAddWorklog(e) {
     });
 
     $("addWorklogDlg").close();
+    workspaceUX.reveal(date);
+    workspaceUX.rememberDate(date);
+    if(date>iso(new Date()))revealedFutureDays.add(date);
     await onFetch({ force: false });
-    void showNotice(`Dodano worklog do ${issueKey}: ${timeHHMM}`);
+    workspaceUX.notify(`Dodano ${timeHHMM} do ${issueKey}${date<params.dateFrom||date>params.dateTo?' · wpis poza wybranym okresem':''}`);
   } catch (err) {
     console.error(err);
     setStatus("Blad.");
     void showNotice(String(err?.message || err));
+  } finally {
+    addWorklogPending=false;$("addWorklogSaveBtn").disabled=fetchInProgress;$("addWorklogSaveBtn").textContent="Dodaj wpis";$("drawerClose").disabled=false;$("addWorklogDlg").querySelector('button[value="cancel"]').disabled=false;
   }
 }
 
 function setActiveTab(tabName) {
+  const legacy=["worklogs","workedIssues","pinnedIssues","reminders"].includes(tabName)?tabName:null;
+  if(legacy)tabName="settings";
+  document.body.dataset.activeTab=tabName;
   if (tabName === "assistant") {
     setBartekOpen(false);
     void bartekAI.assess();
@@ -2059,6 +2109,7 @@ function setActiveTab(tabName) {
   document.querySelectorAll(".tabView").forEach((view) => {
     view.classList.toggle("isActive", view.id === `${tabName}Tab`);
   });
+  if(legacy)workspaceUX.openLegacy(legacy);
 }
 
 $("fetchBtn").addEventListener("click", () => onFetch({ force: true }));
@@ -2199,6 +2250,8 @@ const worklogProposals=installWorklogProposals({
 });
 for(const id of ["baseUrl","email","token"])$(id).addEventListener("change",()=>worklogProposals.cancel());
 
+const workspaceUX=installWorkspaceUX({renderDays,openWorklog:openAddWorklog,openTab:setActiveTab,propose:date=>worklogProposals.propose(date),isBusy:()=>fetchInProgress,getMonthlyTargets:()=>state.monthlyTargets,getWorkSchedule:()=>state.reminder});
+document.body.dataset.activeTab='days';
 // start
 await loadSettings();
 await localAI.load();

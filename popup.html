@@ -4,21 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="popup.css" />
     <title>Jira Worklogs</title>
 </head>
 <body class="popupBody">
 <main class="popupShell">
-    <div class="brandMark">JW</div>
-    <h1>Jira Worklogs</h1>
-    <section id="lastSummary" class="popupSummary" aria-label="Ostatnio pobrane dane" aria-live="polite">Wczytywanie ostatniego wyniku…</section>
-    <button id="openBtn" class="primaryBtn fullWidth">Otworz w nowej karcie</button>
-    <div class="hint">Wersja w karcie zapamietuje stan i ostatni wynik.</div>
+    <header class="popupBrand"><div class="brandMark" aria-hidden="true">JW</div><h1>Jira Worklogs</h1></header>
+    <section id="lastSummary" class="popupSummary" aria-label="Ostatnio pobrane dane" aria-live="polite">Wczytywanie…</section>
+    <button id="openBtn" class="primaryBtn fullWidth">Otwórz worklogi <span aria-hidden="true">↗</span></button>
 </main>
-
-<section class="popupFooter">
-    <span>Atlassian API</span>
-    <span>Local storage</span>
-</section>
 <script type="module" src="popup.js"></script>
 </body>
 </html>
