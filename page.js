@@ -200,6 +200,8 @@ function aggregateIssues(rows) {
     const current = byIssue.get(row.issueKey) || {
       issueKey: row.issueKey,
       summary: row.summary,
+      epic: row.epic,
+      issueType: row.issueType,
       seconds: 0,
       entries: 0,
       source: "Worklog"
@@ -218,6 +220,8 @@ function buildMyIssues() {
     byIssue.set(issue.issueKey, {
       issueKey: issue.issueKey,
       summary: issue.summary,
+      epic: issue.epic,
+      issueType: issue.issueType,
       status: issue.status || "-",
       seconds: 0,
       entries: 0,
@@ -229,6 +233,8 @@ function buildMyIssues() {
     const existing = byIssue.get(issue.issueKey);
     if (existing) {
       existing.summary = existing.summary || issue.summary;
+      existing.epic = existing.epic || issue.epic;
+      existing.issueType = existing.issueType || issue.issueType;
       existing.seconds = issue.seconds;
       existing.entries = issue.entries;
       if (!existing.source.includes("Worklog")) {
@@ -251,7 +257,7 @@ function renderWorkedIssues() {
   const issues = buildMyIssues();
 
   if (!issues.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="emptyCell">Pobierz dane, zeby zobaczyc przypisane tickety i tickety z worklogami.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="emptyCell">Pobierz dane, zeby zobaczyc przypisane tickety i tickety z worklogami.</td></tr>`;
     return;
   }
 
@@ -261,6 +267,7 @@ function renderWorkedIssues() {
       : `<button data-add-worklog="1">Dodaj worklog</button>`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td>${issue.epic ? `${ticketLink(issue.epic.key)} ${escapeHtml(issue.epic.summary)}` : "—"}</td>
       <td>${escapeHtml(issue.issueKey)}</td>
       <td>${escapeHtml(issue.summary)}</td>
       <td>${escapeHtml(issue.status || "-")}</td>
@@ -668,14 +675,42 @@ function bindDayDeleteButtons(card, day) {
   });
 }
 
+const epicIcon = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M9.3 1.5 3.8 8h3.6l-.7 6.5L12.2 7H8.6l.7-5.5Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/></svg>';
+
+function issueTypeIcon(type) {
+  if (!type) return "";
+  const name = type.toLowerCase();
+  const kind = /bug|błąd|blad/.test(name) ? "bug" : /story|requirement|wymaganie/.test(name) ? "story" : /epic/.test(name) ? "epic" : "task";
+  const paths = {
+    bug: '<path d="M5 6h6v3a3 3 0 0 1-6 0V6Zm1-2a2 2 0 0 1 4 0M3 7h2m6 0h2M3.5 10H5m6 0h1.5"/>',
+    story: '<path d="M5 2.5h6v11L8 11.3 5 13.5v-11Z"/>',
+    epic: '<path d="m9 2-5 6h3.4L7 14l5-7H8.6L9 2Z"/>',
+    task: '<path d="M3 3h10v10H3zM5.5 8l1.6 1.6L10.8 6"/>'
+  };
+  return `<span class="issueTypeIcon issueTypeIcon--${kind}" title="${escapeHtml(type)}" aria-label="Typ: ${escapeHtml(type)}"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]}</svg></span>`;
+}
+
+function groupByEpic(items, getIssue = (item) => item) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = getIssue(item).epic?.key || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return [...groups.values()];
+}
+
 function renderDayWorklogs(day) {
   if (!day.entries.length) {
     return `<p class="dayEmpty">Brak worklogow w tym dniu.</p>`;
   }
 
-  const items = day.entries.map((row, index) => `
+  const items = groupByEpic(day.entries.map((row, index) => ({ row, index })), (item) => item.row).map((group) => {
+    const epic = group[0].row.epic;
+    const heading = `<li class="epicGroupHeading"><span class="dayWorklogEpic" title="${escapeHtml(epic?.summary || "")}">${epicIcon}<span>Epic</span>${epic ? ticketLink(epic.key) : "Brak"}</span>${epic?.summary ? `<span class="epicGroupSummary">${escapeHtml(epic.summary)}</span>` : ""}</li>`;
+    return heading + group.map(({ row, index }) => `
     <li class="dayWorklog">
-      <span class="dayWorklogKey">${ticketLink(row.issueKey,true)}</span>
+      <span class="dayWorklogKey"><span class="dayWorklogIssue">${issueTypeIcon(row.issueType)}${ticketLink(row.issueKey,true)}</span></span>
       <span class="dayWorklogTime" aria-label="Czas wpisu: ${escapeHtml(row.timeHHMM)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>${escapeHtml(row.timeHHMM)}</span>
       <span class="dayWorklogText">
         <strong>${escapeHtml(row.summary || "-")}</strong>
@@ -683,7 +718,8 @@ function renderDayWorklogs(day) {
       </span>
       <span class="worklogRowActions"><button type="button" class="editIconBtn" data-edit-entry="${index}" title="Edytuj worklog" aria-label="Edytuj worklog">${editPencilIcon()}</button>${deleteWorklogButton(`data-delete-entry="${index}"`)}</span>
     </li>
-  `);
+  `).join("");
+  });
 
   return `<ul class="dayWorklogs">${items.join("")}</ul>`;
 }
@@ -993,16 +1029,6 @@ function renderDays() {
     const short = day.counted && day.seconds < target;
     const future = target > 0 && !day.counted;
     const dayState = !target ? "isFree" : future ? "isFuture" : short ? "isShort" : "isDone";
-    const delta = !target
-      ? day.isHoliday ? "swieto" : "dzien wolny"
-      : future
-        ? "przed nami"
-        : short
-          ? `brakuje ${fmtHHMM(target - day.seconds)}`
-          : day.seconds > target
-            ? `ponad cel o ${fmtHHMM(day.seconds - target)}`
-            : "cel spelniony";
-
     const card = document.createElement("article");
     card.className = `dayCard ${dayState}`;
     card.id = `day-${day.date}`;
@@ -1021,7 +1047,7 @@ function renderDays() {
           <div class="meterTrack"><span class="meterFill" style="width:${percent}%"></span></div>
           <div class="dayNumbers">
             <div class="dayDeclared"><span>Zadeklarowane</span><strong>${escapeHtml(fmtHHMM(day.seconds))}<small> / ${escapeHtml(fmtHHMM(displayedLimit))}</small></strong></div>
-            <span class="dayDelta${overtime>0?' isOvertime':''}">${overtime>0?`+${escapeHtml(fmtHHMM(overtime))}<small>nadgodzin</small>`:escapeHtml(delta)}</span>
+            <span class="dayDelta ${overtime>0?'isOvertime':'isNoOvertime'}">${overtime>0?`+${escapeHtml(fmtHHMM(overtime))}`:'BRAK'}<small>nadgodzin</small></span>
           </div>
         </div>
       </header>
@@ -1861,7 +1887,9 @@ function showIssuePreview(issue) {
   const loggedSummary = issueLoggedSummary(issue.issueKey);
   logged.textContent = loggedSummary.time;
   attachLoggedTooltip(logged, loggedSummary.tooltip);
-  $("addWorklogInfo").append(key, summary, status, logged);
+  const epic = document.createElement("p");
+  if (issue.epic) { epic.append("Epic: "); const link = document.createElement("span"); link.innerHTML = ticketLink(issue.epic.key); epic.append(link, ` ${issue.epic.summary}`); }
+  $("addWorklogInfo").append(epic, key, summary, status, logged);
 }
 
 function chooseAddIssue(issue) {
@@ -1887,14 +1915,20 @@ async function searchAddIssue() {
   const renderMatches = () => {
     host.replaceChildren();
     const title=document.createElement('h3');title.className='issueResultsHeading';title.textContent=query?'Wyniki wyszukiwania':issuePickerMode==='assigned'?'Przypisane do mnie':issuePickerMode==='recent'?'Ostatnio używane':'Stałe tickety';host.append(title);
-    for (const issue of matches) {
+    for (const group of groupByEpic(matches)) {
+      const epic = group[0].epic;
+      const heading = document.createElement("div");
+      heading.className = "issueResultEpic";
+      heading.innerHTML = `${epicIcon}<span>Epic</span><b>${escapeHtml(epic?.key || "Brak")}</b> <span class="issueEpicSummary">${escapeHtml(epic?.summary || "")}</span>`;
+      host.append(heading);
+      for (const issue of group) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "issueSearchResult";
       button.dataset.issueKey=issue.issueKey;
       button.setAttribute("aria-pressed","false");
       const key = document.createElement("strong");
-      key.textContent = issue.issueKey;
+      key.innerHTML = `${issueTypeIcon(issue.issueType)}${escapeHtml(issue.issueKey)}`;
       const label = document.createElement("span");
       label.textContent = issue.summary || "Brak opisu";
       const status = document.createElement("small");
@@ -1907,6 +1941,7 @@ async function searchAddIssue() {
       button.append(key, label, status, logged);
       button.addEventListener("click", () => chooseAddIssue(issue));
       host.append(button);
+      }
     }
   };
   if(!query&&issuePickerMode!=='assigned'){

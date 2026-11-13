@@ -71,6 +71,27 @@ async function* searchPages(baseUrl, headers, params) {
   }
 }
 
+function epicFromParent(parent) {
+  const type = parent?.fields?.issuetype;
+  if (!parent?.key || !(type?.hierarchyLevel === 1 || type?.name?.toLowerCase() === "epic")) return null;
+  return { key: parent.key, summary: parent.fields?.summary || "" };
+}
+
+async function resolveEpics(issues, baseUrl, headers) {
+  const parents = new Map();
+  await mapConcurrent(issues, async (issue) => {
+    const parent = issue.fields?.parent;
+    issue.epic = epicFromParent(parent);
+    if (!issue.epic && issue.fields?.issuetype?.subtask && parent?.key) {
+      if (!parents.has(parent.key)) {
+        parents.set(parent.key, jiraGet(baseUrl, headers, `/rest/api/3/issue/${encodeURIComponent(parent.key)}`, { fields: "parent" })
+          .then((result) => epicFromParent(result.fields?.parent)).catch(() => null));
+      }
+      issue.epic = await parents.get(parent.key);
+    }
+  });
+}
+
 async function jiraPut(baseUrl, headers, path, payload) {
   const url = baseUrl.replace(/\/$/, "") + path;
   const r = await fetch(url, { method: "PUT", headers, body: JSON.stringify(payload) });
@@ -155,10 +176,11 @@ export async function fetchWorklogsRange({ baseUrl, email, token, dateFrom, date
   jql = projectFilterClause(project) + jql;
 
   const issues = [];
-  for await (const batch of searchPages(baseUrl, headers, { jql, fields: "summary" })) {
+  for await (const batch of searchPages(baseUrl, headers, { jql, fields: "summary,parent,issuetype" })) {
     issues.push(...batch);
   }
 
+  await resolveEpics(issues, baseUrl, headers);
   const rows = [];
   let totalSeconds = 0;
 
@@ -190,6 +212,8 @@ export async function fetchWorklogsRange({ baseUrl, email, token, dateFrom, date
           issueKey: key,
           timeHHMM: fmtHHMM(seconds),
           summary,
+          epic: issue.epic,
+          issueType: issue.fields?.issuetype?.name || "",
           comment: extractComment(wl.comment),
           started,
           seconds,
@@ -216,13 +240,12 @@ export async function fetchAssignedIssues({ baseUrl, email, token }) {
   const issues = [];
   for await (const batch of searchPages(baseUrl, headers, {
     jql: 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC',
-    fields: "summary,status"
+    fields: "summary,status,parent,issuetype"
   })) {
-    issues.push(...batch.map(issue => ({
-      issueKey: issue.key, summary: issue.fields?.summary || "", status: issue.fields?.status?.name || ""
-    })));
+    issues.push(...batch);
   }
-  return issues;
+  await resolveEpics(issues, baseUrl, headers);
+  return issues.map(issue => ({ issueKey: issue.key, summary: issue.fields?.summary || "", status: issue.fields?.status?.name || "", epic: issue.epic, issueType: issue.fields?.issuetype?.name || "" }));
 }
 
 export async function fetchMyIssues({ baseUrl, email, token, dateFrom, dateTo, project }) {
@@ -261,8 +284,12 @@ export async function fetchMyIssues({ baseUrl, email, token, dateFrom, dateTo, p
       status: fields.status?.name || issue.status || "",
       assignee: fields.assignee?.displayName || issue.assignee || "",
       updated: fields.updated || issue.updated || "",
+      epic: issue.epic || null,
+      issueType: fields.issuetype?.name || issue.issueType || "",
       sources: new Set()
     };
+    if (!current.epic) current.epic = issue.epic || null;
+    if (!current.issueType) current.issueType = fields.issuetype?.name || issue.issueType || "";
     if (!current.summary) current.summary = fields.summary || issue.summary || "";
     if (!current.status) current.status = fields.status?.name || issue.status || "";
     if (!current.assignee) current.assignee = fields.assignee?.displayName || issue.assignee || "";
@@ -273,8 +300,9 @@ export async function fetchMyIssues({ baseUrl, email, token, dateFrom, dateTo, p
 
   const collectIssues = async (query, source) => {
     for await (const batch of searchPages(baseUrl, headers, {
-      jql: query, fields: "summary,status,assignee,updated"
+      jql: query, fields: "summary,status,assignee,updated,parent,issuetype"
     })) {
+      await resolveEpics(batch, baseUrl, headers);
       batch.forEach((issue) => addIssue(issue, source));
     }
   };
@@ -310,9 +338,10 @@ export async function fetchMyIssues({ baseUrl, email, token, dateFrom, dateTo, p
   try {
     for await (const batch of searchPages(baseUrl, headers, {
       jql: activityJql,
-      fields: "summary,status,assignee,updated,comment",
+      fields: "summary,status,assignee,updated,comment,parent,issuetype",
       expand: "changelog"
     })) {
+      await resolveEpics(batch, baseUrl, headers);
       await mapConcurrent(batch, async (issue) => {
         try {
           const commentPage = issue.fields?.comment;
@@ -412,8 +441,9 @@ export async function fetchIssuePreview({ baseUrl, email, token, issueKey }) {
   const issue = await jiraGet(baseUrl, {
     Accept: "application/json",
     Authorization: basicAuthHeader(email, token)
-  }, `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, { fields: "summary,status" });
-  return { issueKey: issue.key, summary: issue.fields?.summary || "", status: issue.fields?.status?.name || "" };
+  }, `/rest/api/3/issue/${encodeURIComponent(issueKey)}`, { fields: "summary,status,parent,issuetype" });
+  await resolveEpics([issue], baseUrl, { Accept: "application/json", Authorization: basicAuthHeader(email, token) });
+  return { issueKey: issue.key, summary: issue.fields?.summary || "", status: issue.fields?.status?.name || "", epic: issue.epic, issueType: issue.fields?.issuetype?.name || "" };
 }
 
 export async function deleteWorklog({ baseUrl, email, token, issueKey, worklogId }) {

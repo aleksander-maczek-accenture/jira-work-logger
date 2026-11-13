@@ -248,8 +248,10 @@ body.isFetching #refreshBtn .refreshIcon { animation: fetchSpin 1s linear infini
 .dayDeclared > span { font-size: 9px; font-weight: 400; }
 .dayDeclared > strong { font-size: 16px; line-height: 1.25; font-weight: 650; }
 .dayDeclared > strong > small { font-size: 11px; font-weight: 400; color: var(--muted); }
-.dayNumbers .dayDelta.isOvertime { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; background: color-mix(in srgb,var(--chart-over-target,#7c3aed) 9%,var(--surface)); color: var(--chart-over-target,#7c3aed); padding: 5px 8px; border-radius: 4px; font-size: 12px; font-weight: 650; }
-.dayDelta.isOvertime small { font-size: 9px; font-weight: 400; }
+.dayNumbers .dayDelta:is(.isOvertime, .isNoOvertime) { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; padding: 5px 8px; border-radius: 4px; font-size: 12px; font-weight: 650; }
+.dayNumbers .dayDelta.isOvertime { background: color-mix(in srgb,var(--chart-over-target,#7c3aed) 9%,var(--surface)); color: var(--chart-over-target,#7c3aed); }
+.dayNumbers .dayDelta.isNoOvertime { background: var(--success-soft); color: var(--success); }
+.dayDelta:is(.isOvertime, .isNoOvertime) small { font-size: 9px; font-weight: 400; }
 @media(max-width:1000px) { .appHeader { flex-wrap: wrap; } .workspaceHeaderActions { flex: 1; justify-content: space-between; } }
 @media(max-width:850px) { .dayHeadWithActions { grid-template-columns: minmax(150px,1fr) auto; } .dayNumbers { flex: 0 0 auto; } }
 @media(max-width:600px) {
@@ -267,3 +269,56 @@ body.isFetching #refreshBtn .refreshIcon { animation: fetchSpin 1s linear infini
 .chartInfoButton svg { width: 19px; height: 19px; }
 .chartInfoButton:hover, .chartInfoButton:focus-visible { background: var(--surface-soft); color: var(--primary); }
 #chartCaption { position: fixed; inset: auto; margin: 0; width: max-content; max-width: min(350px,calc(100vw - 16px)); padding: 12px 14px; border: 1px solid #ffffff24; border-radius: 7px; color: #fff; background: #202733; box-shadow: 0 5px 18px #0003; font: 12px/1.65 system-ui,sans-serif; white-space: pre-line; text-align: left; pointer-events: none; }
+
+.dayWorklogKey { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.dayWorklog:has(.dayWorklogEpic),
+#addWorklogDlg .issueSearchResult:has(.issueResultEpic) {
+ box-shadow: inset 0 2px 0 color-mix(in srgb, #8b5cf6 45%, transparent), inset 0 12px 18px -17px #8b5cf6;
+}
+.dayWorklogEpic,
+#addWorklogDlg .issueResultEpic {
+ display: inline-flex;
+ align-items: center;
+ gap: 6px;
+ width: fit-content;
+ max-width: 100%;
+ padding: 4px 8px;
+ border: 1px solid color-mix(in srgb, #8b5cf6 20%, transparent);
+ border-radius: 5px;
+ background: color-mix(in srgb, #8b5cf6 10%, var(--surface));
+ color: #8052da;
+ font-size: 11px;
+ font-weight: 500;
+ white-space: normal;
+}
+.dayWorklogEpic > svg, .issueResultEpic > svg { width: 13px; height: 13px; flex: none; }
+.dayWorklogEpic .ticketLink { color: inherit; padding: 0; font-weight: 650; }
+.dayWorklogIssue, #addWorklogDlg .issueSearchResult strong { display: inline-flex; align-items: center; gap: 7px; }
+.issueTypeIcon { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 4px; background: #e8f0ff; color: #3875db; }
+.issueTypeIcon svg { width: 13px; height: 13px; }
+.issueTypeIcon--story { background: #e3f4ed; color: #268760; }
+.issueTypeIcon--bug { background: #fee9e8; color: #c94d48; }
+.issueTypeIcon--epic { background: #eee7ff; color: #8052da; }
+#addWorklogDlg .issueSearchResult .issueEpicSummary { color: var(--muted); font-weight: 400; }
+#addWorklogDlg .issueSearchResult .issueResultEpic { grid-column: 1 / -1; grid-row: 1; }
+#addWorklogDlg .issueSearchResult:has(.issueResultEpic) strong { grid-row: 2; }
+#addWorklogDlg .issueSearchResult:has(.issueResultEpic) span { grid-row: 3; }
+#addWorklogDlg .issueSearchResult:has(.issueResultEpic) .issueLoggedTime { grid-row: 2; }
+
+.epicGroupHeading { list-style: none; padding: 10px 12px 4px; background: var(--surface-soft); }
+#addWorklogDlg .issueResultEpic { margin: 8px 0; }
+#addWorklogDlg .issueResultEpic .issueEpicSummary { color: var(--muted); font-weight: 400; }
+
+/* Compact group labels keep the rows aligned and make each section easy to scan. */
+.dayWorklogs { background: var(--surface); }
+.dayWorklog { grid-template-columns: 145px 82px minmax(0, 1fr) 76px; }
+.epicGroupHeading { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 14px 3px; background: var(--surface); }
+.dayWorklog + .epicGroupHeading { border-top: 1px solid var(--line); padding-top: 10px; }
+.epicGroupHeading .dayWorklogEpic { padding: 3px 7px; }
+.epicGroupSummary { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) {
+ .dayWorklog { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; }
+ .dayWorklogText { grid-column: 1 / -1; }
+ .dayWorklog .worklogRowActions { grid-column: 2; grid-row: 1; }
+ .dayWorklogTime { grid-column: 1; justify-self: start; }
+}
