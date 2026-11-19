@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const source = fs.readFileSync(new URL('../api.js', import.meta.url), 'utf8');
+const { fetchTeamBoards, fetchBoardPeople, fetchTeamWorklogs } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const params = { baseUrl:'https://example.atlassian.net', email:'test', token:'test', dateFrom:'2026-11-02', dateTo:'2026-11-03' };
+const requests = [];
+globalThis.fetch = async input => {
+  const url = new URL(input); requests.push(url);
+  let data;
+  if (url.pathname === '/rest/agile/1.0/board') data = url.searchParams.get('startAt') === '0' ? { values:[{id:12,name:'Team'}], isLast:false } : { values:[{id:13,name:'Other'}], isLast:true };
+  else if (url.pathname === '/rest/agile/1.0/board/12/issue') data = url.searchParams.get('startAt') === '0' ? { issues:[{fields:{assignee:{accountId:'u1',displayName:'Anna',active:true}}}], total:2 } : { issues:[{fields:{assignee:{accountId:'u2',displayName:'Bartek',active:true}}}], total:2 };
+  else if (url.pathname === '/rest/api/3/search/jql') data = {isLast:true,issues:[{key:'ABC-1',fields:{summary:'Ticket'}}]};
+  else if (url.pathname === '/rest/api/3/issue/ABC-1/worklog') data = url.searchParams.get('startAt') === '0' ? {total:2,worklogs:[{author:{accountId:'u1'},started:'2026-11-02T09:00:00.000+0100',timeSpentSeconds:3600,comment:'Praca'}]} : {total:2,worklogs:[{author:{accountId:'other'},started:'2026-11-02T09:00:00.000+0100',timeSpentSeconds:7200}]};
+  else throw new Error(`Unexpected request ${url}`);
+  return {ok:true,json:async()=>data};
+};
+assert.equal((await fetchTeamBoards(params)).length, 2);
+const people = await fetchBoardPeople({...params,boardId:'12'});
+assert.deepEqual(people.map(person => person.accountId), ['u1','u2']);
+const rows = await fetchTeamWorklogs({...params,people});
+assert.equal(rows.length, 1);
+assert.equal(rows[0].seconds, 3600);
+assert.equal(rows[0].accountId, 'u1');
+assert.match(requests.find(url => url.pathname.endsWith('/search/jql')).searchParams.get('jql'), /worklogAuthor in/);
+console.log('OK: board and worklog pagination, member filtering and date range.');
