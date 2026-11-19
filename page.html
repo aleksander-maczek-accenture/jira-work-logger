@@ -108,9 +108,26 @@
     <button class="tabBtn" type="button" data-tab="workedIssues"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="20" height="23" rx="3"/><path d="m10 13 2 2 4-4m2 3h4m-12 7h12"/></svg></span><span class="tabLabel">Moje tickety</span></button>
     <button class="tabBtn" type="button" data-tab="pinnedIssues"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 5 12 4-3 4v6l-4-1-6 9 3-11-4-2 4-5z"/></svg></span><span class="tabLabel">Stale tickety</span></button>
     <button class="tabBtn" type="button" data-tab="reminders"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 23h18l-3-5v-6a6 6 0 0 0-12 0v6zM13 27h6M16 3v3"/></svg></span><span class="tabLabel">Braki i przypomnienia</span></button>
+    <button class="tabBtn" type="button" data-tab="team"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="11" r="4"/><circle cx="23" cy="12" r="3"/><path d="M4 26c0-5 3-8 8-8s8 3 8 8M20 19c4-1 8 2 8 7"/></svg></span><span class="tabLabel">Zespół</span></button>
     <button class="tabBtn" type="button" data-tab="assistant"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h22v17H13l-8 6zM10 11h12M10 16h8"/></svg></span><span class="tabLabel">Asystent</span></button>
     <button class="tabBtn" type="button" data-tab="settings"><span class="dockIcon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8h20M6 16h20M6 24h20"/><circle cx="12" cy="8" r="3"/><circle cx="21" cy="16" r="3"/><circle cx="12" cy="24" r="3"/></svg></span><span class="tabLabel">Ustawienia</span></button>
 </nav>
+
+<dialog id="teamChartDlg" aria-labelledby="teamChartTitle">
+  <div class="teamChartPanel"><header class="teamChartHead"><div><h2 id="teamChartTitle"></h2><p id="teamChartRange" class="hint"></p></div><button type="button" class="iconButton" id="teamChartClose" aria-label="Zamknij wykres">×</button></header>
+    <p class="hint">Słupki pokazują zalogowany czas, a obrys — dzienny cel według Twojego harmonogramu. Dzisiejszy dzień jeszcze trwa.</p>
+    <div id="teamChart" class="teamChartScroll"></div>
+    <p class="hint">Wykres uwzględnia tylko wpisy widoczne dla Twojego konta i nie uwzględnia indywidualnych urlopów ani wymiarów etatu.</p>
+  </div>
+</dialog>
+
+<section id="teamTab" class="panel tabView teamView">
+  <div class="teamHead"><div><h2>Worklogi zespołu</h2><p class="hint">Sprawdź widoczne wpisy w wybranym okresie. Osoby z największymi brakami są na górze.</p></div></div>
+  <div class="teamControls"><span>Board HBOMS · 4009</span><button type="button" class="primaryBtn" id="teamLoad">Odśwież worklogi</button><button type="button" class="secondaryBtn" id="teamRefreshPeople">Uzupełnij osoby z boarda</button></div>
+  <details class="teamInfo"><summary>Jak powstaje lista i podsumowanie?</summary><p>Lista jest zapisana lokalnie. Początkowo pochodzi z osób przypisanych do widocznych ticketów na boardzie i może być niepełna. Dostępność wpisów zależy od uprawnień w Jira.</p><p>Ocena używa Twojego harmonogramu i świąt dla wszystkich, bez indywidualnych urlopów i wymiarów etatu. Bieżący dzień jeszcze trwa i nie jest traktowany jako brak.</p></details>
+  <div class="teamAdd"><label class="field">Dodaj osobę<input id="teamUserQuery" placeholder="Imię lub nazwisko" autocomplete="off"></label><button id="teamSearchUser" type="button" class="secondaryBtn">Szukaj</button><select id="teamUserResults" aria-label="Wyniki wyszukiwania osób"><option value="">Wybierz osobę</option></select><button id="teamAddUser" type="button" class="secondaryBtn">Dodaj</button></div>
+  <p id="teamStatus" role="status" aria-live="polite" class="teamStatus">Kliknij „Sprawdź zespół”, aby pobrać dane z boarda HBOMS.</p><div id="teamResults"></div>
+</section>
 
 <section id="daysTab" class="panel tablePanel tabView isActive">
     <div class="sectionHeader tableHeader">
@@ -316,9 +333,11 @@
                 <input id="project" placeholder="ABC, DEF" aria-describedby="projectHint" />
                 <span id="projectHint" class="hint">Klucze oddziel przecinkami. Puste pole: wszystkie projekty.</span>
             </label>
-            <label class="field fieldWide">Ticket na spotkania
+            <label class="field">Ticket na pozostałe spotkania
                 <input id="meetingIssueKey" placeholder="ABC-9" />
             </label>
+            <label class="field">Ticket na Daily<input id="dailyIssueKey" placeholder="ABC-9" /></label>
+            <label class="field">Ticket na Planning<input id="planningIssueKey" placeholder="ABC-9" /></label>
         </div>
         <section class="localAISettings" aria-labelledby="localAIHeading">
             <h3 id="localAIHeading">Lokalne podsumowania AI · Ollama</h3>

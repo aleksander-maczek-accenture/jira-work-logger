@@ -474,3 +474,68 @@ export async function fetchMyIssueWorklogs({baseUrl,email,token,issueKey}) {
   }
   return rows;
 }
+
+// A board has no authoritative membership list; issue assignees are only candidates.
+export async function fetchTeamBoards({ baseUrl, email, token }) {
+  const headers = { Accept: 'application/json', Authorization: basicAuthHeader(email, token) };
+  const boards = [];
+  for (let startAt = 0; ;) {
+    const data = await jiraGet(baseUrl, headers, '/rest/agile/1.0/board', { startAt, maxResults: 50 });
+    const batch = data.values || []; boards.push(...batch);
+    if (data.isLast === true || !batch.length || (typeof data.total === 'number' && startAt + batch.length >= data.total)) break;
+    startAt += batch.length;
+  }
+  return boards.map(({ id, name }) => ({ id, name }));
+}
+
+export async function fetchBoardPeople({ baseUrl, email, token, boardId }) {
+  if (!/^\d+$/.test(String(boardId))) throw new Error('Wybierz poprawny board.');
+  const headers = { Accept: 'application/json', Authorization: basicAuthHeader(email, token) };
+  const people = new Map();
+  for (let startAt = 0; ;) {
+    const data = await jiraGet(baseUrl, headers, `/rest/agile/1.0/board/${boardId}/issue`, { startAt, maxResults: 100, fields: 'assignee' });
+    const batch = data.issues || [];
+    for (const issue of batch) {
+      const user = issue.fields?.assignee;
+      if (user?.accountId && user.active !== false) people.set(user.accountId, { accountId: user.accountId, displayName: user.displayName || user.accountId });
+    }
+    if (data.isLast === true || !batch.length || (typeof data.total === 'number' && startAt + batch.length >= data.total)) break;
+    startAt += batch.length;
+  }
+  return [...people.values()];
+}
+
+export async function searchTeamPeople({ baseUrl, email, token, query }) {
+  const headers = { Accept: 'application/json', Authorization: basicAuthHeader(email, token) };
+  const users = await jiraGet(baseUrl, headers, '/rest/api/3/user/search', { query, maxResults: 50 });
+  return users.filter(user => user.accountId && user.active !== false).map(user => ({ accountId: user.accountId, displayName: user.displayName || user.accountId }));
+}
+
+export async function fetchTeamWorklogs({ baseUrl, email, token, dateFrom, dateTo, people }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo) || dateFrom > dateTo) throw new Error('Nieprawidłowy zakres dat.');
+  const headers = { Accept: 'application/json', Authorization: basicAuthHeader(email, token) };
+  const ids = new Set(people.map(person => person.accountId));
+  const found = new Map();
+  const allIds = [...ids];
+  for (let offset = 0; offset < allIds.length; offset += 30) {
+    const authors = allIds.slice(offset, offset + 30).map(id => `"${String(id).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',');
+    for await (const batch of searchPages(baseUrl, headers, { jql: `worklogAuthor in (${authors}) AND worklogDate >= "${dateFrom}" AND worklogDate <= "${dateTo}"`, fields: 'summary' })) {
+      for (const issue of batch) found.set(issue.key, issue);
+    }
+  }
+  const rows = [];
+  await mapConcurrent([...found.values()], async issue => {
+    for (let startAt = 0; ;) {
+      const data = await jiraGet(baseUrl, headers, `/rest/api/3/issue/${encodeURIComponent(issue.key)}/worklog`, { startAt, maxResults: 100 });
+      const batch = data.worklogs || [];
+      for (const worklog of batch) {
+        const date = worklog.started?.slice(0, 10), accountId = worklog.author?.accountId;
+        if (!ids.has(accountId) || !date || date < dateFrom || date > dateTo) continue;
+        rows.push({ accountId, date, issueKey: issue.key, summary: issue.fields?.summary || '', seconds: Number(worklog.timeSpentSeconds || 0), comment: extractComment(worklog.comment) });
+      }
+      if (!batch.length || (typeof data.total === 'number' && startAt + batch.length >= data.total)) break;
+      startAt += batch.length;
+    }
+  });
+  return rows;
+}

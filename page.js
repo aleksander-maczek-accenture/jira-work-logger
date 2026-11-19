@@ -1,3 +1,4 @@
+import { installTeamView } from './team-view.js';
 import { dailyWorkLimit, dailyOvertime } from './time-metrics.js';
 import { setLoadingWave } from './loading-wave.js';
 import { installWorkspaceUX } from './workspace-ux.js';
@@ -326,7 +327,9 @@ async function saveSettings() {
     dateFrom: $("dateFrom").value,
     dateTo: $("dateTo").value,
     project: $("project").value.trim(),
-    meetingIssueKey: $("meetingIssueKey").value.trim().toUpperCase()
+    meetingIssueKey: $("meetingIssueKey").value.trim().toUpperCase(),
+    dailyIssueKey: $("dailyIssueKey").value.trim().toUpperCase(),
+    planningIssueKey: $("planningIssueKey").value.trim().toUpperCase()
   });
 }
 
@@ -369,6 +372,8 @@ async function loadSettings() {
     "project",
     "pinnedIssues",
     "meetingIssueKey",
+    "dailyIssueKey",
+    "planningIssueKey",
     "theme",
     "jiraPanelEnabled",
     "refreshOnReload",
@@ -383,6 +388,8 @@ async function loadSettings() {
   if (data.token) $("token").value = data.token;
   if (data.project) $("project").value = data.project;
   if (data.meetingIssueKey) $("meetingIssueKey").value = data.meetingIssueKey;
+  $("dailyIssueKey").value = data.dailyIssueKey ?? data.meetingIssueKey ?? "";
+  $("planningIssueKey").value = data.planningIssueKey ?? data.meetingIssueKey ?? "";
 
   // domyślne daty jak w Pythonie
   const today = new Date();
@@ -561,20 +568,8 @@ function stepMeetingCount(typeId, step) {
 
 function openMeetings(date) {
   if(fetchInProgress)return;
-  const issueKey = $("meetingIssueKey").value.trim().toUpperCase();
-  if (!issueKey) {
-    openSettings("meetingIssueKey");
-    return;
-  }
-
-  const knownIssue = findKnownIssue(issueKey);
-  if (knownIssue && isDoneStatus(knownIssue.status)) {
-    void showNotice(`Nie mozna dodac workloga do ${issueKey}, bo ticket jest DONE.`);
-    return;
-  }
-
   state.meetingCounts = {};
-  $("meetingsInfo").textContent = `Ticket: ${issueKey}${knownIssue?.summary ? `\n${knownIssue.summary}` : ""}`;
+  $("meetingsInfo").textContent = `Daily: ${meetingKeyFor("daily") || "brak"} · Planning: ${meetingKeyFor("planning") || "brak"} · Pozostałe: ${meetingKeyFor("other") || "brak"}`;
   $("meetingsDate").value = date || iso(new Date());
   renderMeetings();
   $("meetingsDlg").showModal();
@@ -586,16 +581,20 @@ async function onSubmitMeetings(e) {
   const added = [];
   try {
     const params = validate();
-    const issueKey = $("meetingIssueKey").value.trim().toUpperCase();
     const date = $("meetingsDate").value;
     const { items, count, seconds } = meetingTotals();
     const picked = items.filter((item) => item.count > 0);
 
-    if (!issueKey) throw new Error("Podaj ticket na spotkania.");
     if (!date) throw new Error("Podaj date.");
     if (!picked.length) throw new Error("Wybierz przynajmniej jedno spotkanie.");
 
     for (const item of picked) {
+      const issueKey = meetingKeyFor(item.id);
+      if (!issueKey) throw new Error(`Ustaw ticket dla ${item.label} w ustawieniach.`);
+      if (isDoneStatus(findKnownIssue(issueKey)?.status)) throw new Error(`Ticket ${issueKey} ma status DONE.`);
+    }
+    for (const item of picked) {
+      const issueKey = meetingKeyFor(item.id);
       setStatus(`Dodaje worklog: ${item.label} (${added.length + 1}/${picked.length})...`);
       await addWorklog({
         baseUrl: params.baseUrl,
@@ -611,7 +610,7 @@ async function onSubmitMeetings(e) {
 
     $("meetingsDlg").close();
     await onFetch({ force: false });
-    void showNotice(`Dodano ${added.length} worklogow do ${issueKey}: ${fmtHHMM(seconds)} (${pluralMeetings(count)}).`);
+    void showNotice(`Dodano ${added.length} worklogow: ${fmtHHMM(seconds)} (${pluralMeetings(count)}).`);
   } catch (err) {
     console.error(err);
     setStatus("Blad.");
@@ -663,9 +662,11 @@ function dayLongName(dateIso) {
   return fromIso(dateIso).toLocaleDateString("pl-PL", { weekday: "long" });
 }
 
-function meetingIssueKeyValue() {
-  return $("meetingIssueKey").value.trim().toUpperCase();
+function meetingKeyFor(type) {
+  const id = type === "daily" ? "dailyIssueKey" : type === "planning" ? "planningIssueKey" : "meetingIssueKey";
+  return $(id).value.trim().toUpperCase();
 }
+function meetingIssueKeyValue() { return meetingKeyFor("daily"); }
 
 function bindDayDeleteButtons(card, day) {
   card.querySelectorAll("[data-delete-entry]").forEach(button => {
@@ -843,12 +844,80 @@ function attachDayNote(card, date) {
   const actions=content.querySelector('.dayQuickActions');
   const more=document.createElement('button');more.type='button';more.className='secondaryBtn dayQuickBtn dayMoreButton';more.textContent='•••';more.setAttribute('aria-label','Wiecej akcji dnia');
   const menu=document.createElement('div');menu.id=`day-more-${date}`;menu.className='dayMoreMenu';menu.setAttribute('popover','auto');menu.setAttribute('aria-label','Pozostale akcje dnia');
-  for(const action of [...actions.children])if(!action.matches('[data-add-day-worklog]'))menu.append(action);
+  for(const action of [...actions.children])if(!action.matches('[data-add-day-worklog], [data-inline-day]'))menu.append(action);
   more.setAttribute('popovertarget',menu.id);
   menu.addEventListener('toggle',()=>{if(!menu.matches(':popover-open'))return;const rect=more.getBoundingClientRect();menu.style.left=`${Math.max(8,Math.min(rect.right-menu.offsetWidth,window.innerWidth-menu.offsetWidth-8))}px`;menu.style.top=`${Math.max(8,Math.min(rect.bottom+6,window.innerHeight-menu.offsetHeight-8))}px`;});
   menu.addEventListener('click',event=>{if(event.target.closest('button')&&menu.matches(':popover-open'))menu.hidePopover();});
   actions.append(more,menu);
   card.append(content, note);
+}
+
+async function openInlineDayEditor(day, card) {
+  const previous = card.querySelector(".inlineDayEditor");
+  if (previous) { if (previous.dataset.changed === "true") { previous.remove(); void onFetch({ force: false }); } else previous.remove(); return; }
+  let params;
+  try { params = validate(); } catch (error) { void showNotice(String(error?.message || error)); return; }
+  const panel = document.createElement("section"); panel.className = "inlineDayEditor";
+  panel.innerHTML = '<h3>Edycja wpisów</h3><p class="inlineDayStatus" role="status">Pobieram wpisy i przypisane tickety…</p><div class="inlineDayContent"></div>';
+  card.append(panel);
+  try {
+    const [worklogs, issues] = await Promise.all([fetchWorklogsRange({ ...params, dateFrom: day.date, dateTo: day.date, project: null }), fetchAssignedIssues(params)]);
+    if (!panel.isConnected) return;
+    const content = panel.querySelector(".inlineDayContent"), status = panel.querySelector(".inlineDayStatus");
+    status.textContent = "Zmień czas lub komentarz i zapisz wybrany wiersz. Suma uwzględnia wszystkie projekty.";
+    const list = document.createElement("div"); list.className = "inlineDayRows"; content.append(list);
+    function makeRow(issue, entry = null) {
+      const row = document.createElement("div");
+      row.className = `inlineDayRow${entry ? "" : " inlineDayNew"}`;
+      row.innerHTML = `<div class="inlineDayTicket"><strong>${escapeHtml(issue.issueKey)}</strong><span>${escapeHtml(issue.summary || "Brak opisu")}</span>${entry ? "" : "<small>Nowy wpis</small>"}</div><label>Czas<input data-time value="${escapeHtml(entry?.timeHHMM || "")}" placeholder="00:00" aria-label="Czas ${escapeHtml(issue.issueKey)}" inputmode="numeric"></label><label>Komentarz<input data-comment value="${escapeHtml(entry?.comment || "")}" placeholder="Opcjonalnie" aria-label="Komentarz ${escapeHtml(issue.issueKey)}"></label><button type="button" class="${entry ? "secondaryBtn" : "primaryBtn"}">${entry ? "Zapisz" : "Dodaj"}</button>`;
+      list.append(row);
+      row.querySelector("button").addEventListener("click", async () => {
+        const button = row.querySelector("button");
+        try {
+          const timeHHMM = row.querySelector("[data-time]").value.trim();
+          const seconds = parseHHMM(timeHHMM);
+          if (!seconds || !Number.isSafeInteger(seconds)) throw new Error("Czas musi być większy od zera.");
+          const comment = row.querySelector("[data-comment]").value.trim();
+          button.disabled = true; status.textContent = `Zapisuję ${issue.issueKey}…`;
+          if (entry) {
+            await updateWorklog({ ...params, issueKey: entry.issueKey, worklogId: entry.worklogId, started: entry.started, newSeconds: seconds, comment });
+            entry.seconds = seconds; entry.timeHHMM = fmtHHMM(seconds); entry.comment = comment;
+            row.querySelector("[data-time]").value = entry.timeHHMM;
+            button.disabled = false;
+          } else {
+            await addWorklog({ ...params, issueKey: issue.issueKey, date: day.date, timeHHMM, comment });
+            row.querySelectorAll("input").forEach(input => input.disabled = true);
+            button.textContent = "Dodano";
+          }
+          panel.dataset.changed = "true";
+          status.textContent = "Zapisano wpis. Podsumowanie dnia odświeży się po zamknięciu edycji.";
+          updateTotal();
+        } catch (error) { status.textContent = `Nie udało się zapisać: ${error?.message || error}`; button.disabled = false; }
+      });
+    }
+    const assignedKeys = new Set(issues.map(issue => issue.issueKey));
+    for (const group of groupByEpic(issues)) {
+      for (const issue of group) {
+        const entries = worklogs.rows.filter(entry => entry.issueKey === issue.issueKey);
+        for (const entry of entries) makeRow(issue, entry);
+        makeRow(issue);
+      }
+    }
+    for (const entry of worklogs.rows) if (!assignedKeys.has(entry.issueKey)) makeRow(entry, entry);
+    if (!issues.length && !worklogs.rows.length) status.textContent = "Brak przypisanych ticketów i zapisanych wpisów w tym dniu.";
+    const total = document.createElement("p"); total.className = "inlineDayTotal"; content.append(total);
+    function updateTotal() {
+      let seconds = 0, valid = true;
+      for (const row of list.children) {
+        const input = row.querySelector("[data-time]"), value = input.value.trim(); input.removeAttribute("aria-invalid");
+        if (!value && row.classList.contains("inlineDayNew")) continue;
+        try { const n = parseHHMM(value); if (!n || !Number.isSafeInteger(n)) throw new Error(); seconds += n; }
+        catch { valid = false; input.setAttribute("aria-invalid", "true"); }
+      }
+      total.textContent = valid ? `Razem po zapisaniu: ${fmtHHMM(seconds)}` : "Podaj poprawny czas w formacie HH:MM.";
+    }
+    list.addEventListener("input", updateTotal); updateTotal();
+  } catch (error) { if (panel.isConnected) panel.querySelector(".inlineDayStatus").textContent = `Nie udało się pobrać danych: ${error?.message || error}`; }
 }
 
 function dayActionIcon(name) {
@@ -1040,6 +1109,7 @@ function renderDays() {
         </div>
         <div class="dayQuickActions" role="group" aria-label="Akcje dnia ${day.date}">
           <button type="button" class="secondaryBtn dayQuickBtn" data-add-daily title="${escapeHtml(issueKey ? `Dodaj Daily ${fmtHHMM(Math.round(DAILY_TYPE.hours * 3600))} do ${issueKey}` : "Ustaw ticket na spotkania w konfiguracji")}" ${issueKey ? "" : "disabled"}>${dayActionIcon("daily")}<span>Daily</span></button>
+          <button type="button" class="secondaryBtn dayQuickBtn" data-inline-day title="Edytuj i dodaj wpisy">✎ <span>Edytuj wpisy</span></button>
           <button type="button" class="secondaryBtn dayQuickBtn" data-add-day-worklog title="Dodaj worklog za ${day.date}">${dayActionIcon("add")}<span>Wpis</span></button>
           <button type="button" class="secondaryBtn dayQuickBtn" data-toggle-vacation title="Oznacz dzien jako urlop">${dayActionIcon("vacation")}<span>Urlop</span></button>
         </div>
@@ -1058,6 +1128,7 @@ function renderDays() {
     card.querySelectorAll("button[data-edit-entry]").forEach((button) => {
       button.addEventListener("click", () => openEdit(day.entries[Number(button.dataset.editEntry)]));
     });
+    card.querySelector("[data-inline-day]").addEventListener("click", () => { void openInlineDayEditor(day, card); });
     card.querySelector("[data-toggle-vacation]").addEventListener("click", (event) => {
       void toggleVacation(day.date, event.currentTarget);
     });
@@ -2210,7 +2281,9 @@ function openSettings(focusId) {
   if (focusId) $(focusId).focus();
 }
 
-for (const id of ["baseUrl", "email", "token", "project", "meetingIssueKey"]) {
+for (const id of ["dailyIssueKey", "planningIssueKey"]) $(id).addEventListener("change", () => { $(id).value = $(id).value.trim().toUpperCase(); renderAll(); });
+
+for (const id of ["baseUrl", "email", "token", "project", "meetingIssueKey", "dailyIssueKey", "planningIssueKey"]) {
   $(id).addEventListener("change", async () => {
     try {
       await saveSettings();
@@ -2285,10 +2358,13 @@ const worklogProposals=installWorklogProposals({
 });
 for(const id of ["baseUrl","email","token"])$(id).addEventListener("change",()=>worklogProposals.cancel());
 
+const teamView = installTeamView({ getParams: validate, getSchedule: () => state.reminder });
+
 const workspaceUX=installWorkspaceUX({renderDays,openWorklog:openAddWorklog,openTab:setActiveTab,propose:date=>worklogProposals.propose(date),isBusy:()=>fetchInProgress,getMonthlyTargets:()=>state.monthlyTargets,getWorkSchedule:()=>state.reminder});
 document.body.dataset.activeTab='days';
 // start
 await loadSettings();
+await teamView.restore();
 await localAI.load();
 renderPinnedIssues();
 renderAll();

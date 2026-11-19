@@ -322,3 +322,90 @@ body.isFetching #refreshBtn .refreshIcon { animation: fetchSpin 1s linear infini
  .dayWorklog .worklogRowActions { grid-column: 2; grid-row: 1; }
  .dayWorklogTime { grid-column: 1; justify-self: start; }
 }
+
+.inlineDayEditor { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); }
+.inlineDayEditor h3 { margin: 0 0 6px; font-size: 14px; }
+.inlineDayStatus { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.inlineDayRows { display: grid; gap: 6px; }
+.inlineDayRow { display: grid; grid-template-columns: minmax(170px, 1.4fr) 95px minmax(150px, 1fr) auto; align-items: end; gap: 10px; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.inlineDayRow label { display: grid; gap: 4px; min-width: 0; color: var(--muted); font-size: 11px; }
+.inlineDayRow input, .inlineDayRow select { width: 100%; min-width: 0; box-sizing: border-box; }
+.inlineDayRow input[aria-invalid="true"] { border-color: #c74646; }
+.inlineDayTicket { display: grid; align-self: center; min-width: 0; gap: 3px; font-size: 12px; }
+.inlineDayTicket strong { color: var(--primary); }
+.inlineDayTicket span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inlineDayNew { border-style: dashed; }
+.inlineDayTotal { margin: 12px 0 0; text-align: right; font-weight: 700; }
+@media (max-width: 800px) { .inlineDayRow { grid-template-columns: minmax(0, 1fr) minmax(90px, auto); } .inlineDayTicket, .inlineDayNew > label:first-child { grid-column: 1 / -1; } }
+
+.teamView h2 { margin: 0 0 5px; }
+.teamControls, .teamAdd { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 16px 0; }
+.teamControls .field, .teamAdd .field { flex: 1 1 220px; }
+.teamAdd select { min-width: 180px; }
+.teamStatus { color: var(--muted); font-size: 13px; }
+.teamPerson { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); margin: 8px 0; }
+.teamPerson > summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px; cursor: pointer; }
+.teamPersonName { font-weight: 700; }
+.teamPersonStats { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 12px; }
+.teamGap, .teamOk { padding: 4px 8px; border-radius: 5px; font-weight: 700; }
+.teamGap { color: #b34638; background: #fcece9; }
+.teamOk { color: #26815a; background: #e6f5ec; }
+.teamPersonDays { border-top: 1px solid var(--line); }
+.teamDay { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 14px; font-size: 12px; }
+.teamDay + .teamDay { border-top: 1px solid var(--line); }
+.teamDay ul, .teamDay > small { grid-column: 1 / -1; margin: 0; }
+.teamDay li { padding: 4px 0; }
+.teamDay li span { font-weight: 700; }
+.teamDay li p { margin: 3px 0; color: var(--muted); }
+.teamPersonActions { display: flex; justify-content: flex-end; padding: 8px 14px 14px; }
+.teamPersonActions button { font-size: 12px; }
+#teamChartDlg { width: min(960px, calc(100vw - 32px)); max-width: none; max-height: 85vh; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); }
+.teamChartPanel { padding: 22px; }
+.teamChartHead { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.teamChartHead h2 { margin: 0; }
+.teamChartScroll { overflow-x: auto; }
+.teamChartScroll svg { display: block; width: 100%; height: 260px; }
+.teamChartScroll svg text { fill: var(--muted); font: 10px system-ui, sans-serif; }
+.teamChartGrid { stroke: var(--line); stroke-width: 1; }
+.teamChartTarget { fill: none; stroke: var(--muted); stroke-opacity: .45; stroke-dasharray: 3 2; }
+.teamChartBar { fill: var(--primary); }
+.teamChartBar.isShort { fill: #d88942; }
+.teamChartData { margin-top: 8px; font-size: 12px; }
+.teamChartData summary { cursor: pointer; color: var(--muted); }
+.teamChartData table { width: 100%; margin-top: 8px; text-align: left; border-collapse: collapse; }
+.teamChartData th, .teamChartData td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.teamPersonActions { gap: 8px; }
+/* Team overview */
+.teamView { padding: 24px; }
+.teamHead h2 { font-size: 19px; }
+.teamHead p { margin: 5px 0 0; }
+.teamControls { align-items: center; gap: 8px; margin: 18px 0 12px; }
+.teamControls > span { margin-right: auto; padding: 6px 10px; border-radius: 6px; background: var(--surface-soft); color: var(--muted); font-size: 12px; font-weight: 650; }
+.teamInfo { margin: 12px 0; color: var(--muted); font-size: 12px; }
+.teamInfo summary { cursor: pointer; font-weight: 600; }
+.teamInfo p { margin: 7px 0; line-height: 1.5; }
+.teamAdd { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+.teamAdd .field { flex: 1 1 200px; }
+.teamAdd select { width: auto; min-width: 180px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); }
+.teamStatus { margin: 18px 0 10px; }
+.teamPerson { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; margin: 0; border-radius: 0; }
+.teamPerson + .teamPerson { border-top: 0; }
+.teamPerson:first-child { border-radius: 8px 8px 0 0; }
+.teamPerson:last-child { border-radius: 0 0 8px 8px; }
+.teamPerson:only-child { border-radius: 8px; }
+.teamPersonDetails { min-width: 0; }
+.teamPersonDetails > summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; min-height: 58px; padding: 10px 16px; cursor: pointer; list-style: none; }
+.teamPersonDetails > summary::-webkit-details-marker { display: none; }
+.teamPersonName::before { content: '›'; display: inline-block; margin-right: 10px; color: var(--muted); font-size: 18px; transition: transform .15s; }
+.teamPersonDetails[open] .teamPersonName::before { transform: rotate(90deg); }
+.teamPersonName { font-size: 13px; }
+.teamPersonActions { align-self: start; display: flex; align-items: center; gap: 6px; padding: 10px 12px 10px 0; }
+.teamPersonActions button { min-height: 36px; white-space: nowrap; }
+.teamUnknown { padding: 4px 8px; border-radius: 5px; background: var(--surface-soft); color: var(--muted); font-weight: 600; }
+.teamEmptyDay { margin: 12px 16px; }
+@media (max-width: 760px) {
+ .teamView { padding: 16px; }
+ .teamPerson { grid-template-columns: 1fr; }
+ .teamPersonActions { padding: 0 12px 12px; justify-content: flex-start; }
+ .teamPersonDetails > summary { min-height: 48px; }
+}
