@@ -334,7 +334,7 @@ async function saveSettings() {
 }
 
 function applyTheme(value) {
-  const theme = ["classic", "ledger", "bartek", "xp", "minecraft", "audiophile", "macos", "yellow"].includes(value) ? value : "classic";
+  const theme = ["classic", "ledger", "bartek", "xp", "minecraft", "audiophile", "macos", "yellow", "cyberpunk"].includes(value) ? value : "classic";
   document.body.dataset.theme = theme;
   $("themeSelect").value = theme;
 }
